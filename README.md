@@ -20,6 +20,8 @@ This repository contains a 7-day MVP for a planner-facing pharma dispatch contro
 
 The planner is the only end user in this MVP.
 
+Until the real engines are connected, the platform layer may use contract-compatible stub outputs for `M1`, `M2`, and `M3` so the planner flow and frontend can be developed end to end.
+
 ## Locked MVP Scope
 
 - 15 SKUs
@@ -125,9 +127,13 @@ This is local demo behavior, not enterprise transaction ownership.
 
 - Frontend: Next.js
 - Backend: FastAPI
-- Database: PostgreSQL
+- Database: MySQL 8 (Docker local default)
 - ML: Python, XGBoost, scikit-learn
 - Optimization: Google OR-Tools
+
+## Platform Delivery Note
+
+- Outside-engine platform work, local MySQL setup, integration readers, ETA mock API, planner flow, demo-state simulation, and engine stubs are planned in `PLATFORM_DEMO_STATE_PLAN.md`.
 
 ## Repository Note
 

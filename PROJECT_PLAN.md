@@ -9,6 +9,8 @@ Deliver a working planner-facing MVP that:
 - runs `M1`, `M2`, and `M3` as pure engines
 - lets the planner review, edit, approve, reject, and override plans
 - simulates reservation and stock movement in a separate demo-only state module
+- uses local MySQL through Docker for MVP persistence
+- uses contract stubs to keep the platform and planner flow usable until the real engines are plugged in
 
 ## Success Criteria
 
@@ -38,6 +40,12 @@ By the end of day 7, the demo must show:
 - `capacity_unit` for lorry/load feasibility
 - planner-only frontend
 
+## Platform Defaults
+
+- MySQL 8 in Docker is the default local database setup.
+- One local MySQL database stores snapshots, planner decisions, engine runs, demo-state data, and audit data.
+- Contract stubs may stand in for `M1`, `M2`, and `M3` until the real engines are connected.
+
 ## Team Split
 
 ### Developer 1 - Demo State Only
@@ -65,6 +73,8 @@ By the end of day 7, the demo must show:
 ## Workstreams
 
 ### Stream A - Inputs and orchestration
+- local MySQL setup and migrations
+- snapshot storage
 - manifest snapshot reader
 - warehouse stock reader
 - DC stock reader
@@ -72,6 +82,7 @@ By the end of day 7, the demo must show:
 - lorry state reader
 - ETA provider
 - API orchestration for planner views
+- contract-compatible stub orchestration for engine outputs
 
 ### Stream B - Engines
 - `M1` priority scoring
@@ -97,11 +108,12 @@ By the end of day 7, the demo must show:
 - generate folder skeleton
 
 ### Day 2
-- set up snapshot readers and ETA mock integration
+- set up local MySQL, migrations, snapshot readers, and ETA mock integration
 - seed data and route graph
 
 ### Day 3
 - implement `M1`
+- add contract stubs where platform work must proceed before real engine hookup
 - start planner priority view
 
 ### Day 4

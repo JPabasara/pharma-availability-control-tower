@@ -96,11 +96,20 @@ The demo must visibly show:
 
 The important rule is that only the demo-state module owns steps 5 and 6.
 
+## Strategy 8 - Use Contract Stubs To Unblock Platform
+
+Outside-engine work should be able to move before the real engines are integrated.
+
+- return contract-compatible stub outputs for `M1`, `M2`, and `M3` where needed
+- keep API shapes stable so real engines can replace stubs without rewriting frontend or planner flow
+- treat stubs as temporary platform scaffolding, not engine logic
+
 ## Technical Posture
 
 - FastAPI orchestrates readers, engines, planner flow, and reporting
 - Next.js provides the planner console
-- PostgreSQL stores snapshots, decisions, audit, and demo-state data
+- MySQL 8 stores snapshots, decisions, audit, and demo-state data
+- Docker-based local MySQL is the default MVP setup
 - XGBoost supports M1 and the M3 ranker
 - OR-Tools supports dispatch optimization
 
