@@ -1,0 +1,16 @@
+id,name,code,category,reefer_required,unit_weight_kg,unit_volume_m3
+1,Amoxicillin 500mg,AMX-500,Antibiotics,0,0.5,0.001
+2,Metformin 850mg,MET-850,Diabetes,0,0.4,0.0008
+3,Insulin Glargine 100IU,INS-100,Diabetes,1,0.3,0.0006
+4,Omeprazole 20mg,OMP-20,Gastrointestinal,0,0.3,0.0005
+5,Atorvastatin 40mg,ATV-40,Cardiovascular,0,0.35,0.0006
+6,Adalimumab 40mg,ADA-40,Biologics,1,0.6,0.002
+7,Paracetamol 500mg,PAR-500,Analgesics,0,0.45,0.0009
+8,Lisinopril 10mg,LIS-10,Cardiovascular,0,0.3,0.0005
+9,Salbutamol Inhaler 100mcg,SAL-INH,Respiratory,0,0.25,0.003
+10,Erythropoietin 4000IU,EPO-4K,Biologics,1,0.4,0.001
+11,Ciprofloxacin 500mg,CIP-500,Antibiotics,0,0.5,0.001
+12,Losartan 50mg,LOS-50,Cardiovascular,0,0.3,0.0005
+13,Rituximab 500mg,RTX-500,Biologics,1,1.2,0.004
+14,Amlodipine 5mg,AML-5,Cardiovascular,0,0.25,0.0004
+15,Trastuzumab 150mg,TRZ-150,Biologics,1,0.8,0.003

@@ -1,0 +1,13 @@
+id,origin_type,origin_id,destination_type,destination_id,travel_time_hours,cost
+1,warehouse,1,dc,1,2.0,5000
+2,warehouse,1,dc,2,4.5,12000
+3,warehouse,1,dc,3,3.5,9000
+4,warehouse,1,dc,4,8.0,25000
+5,warehouse,1,dc,5,3.0,7500
+6,dc,1,dc,2,3.5,8000
+7,dc,1,dc,3,2.5,6000
+8,dc,1,dc,5,2.0,5000
+9,dc,2,dc,5,2.5,6000
+10,dc,2,dc,4,6.0,18000
+11,dc,3,dc,1,2.5,6000
+12,dc,5,dc,4,5.5,16000

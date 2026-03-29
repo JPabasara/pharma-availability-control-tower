@@ -1,0 +1,9 @@
+id,registration,lorry_type,capacity_units,status
+1,LR-N-001,normal,500,available
+2,LR-N-002,normal,450,available
+3,LR-N-003,normal,500,available
+4,LR-N-004,normal,400,available
+5,LR-N-005,normal,450,available
+6,LR-R-001,reefer,350,available
+7,LR-R-002,reefer,300,available
+8,LR-R-003,reefer,350,available
