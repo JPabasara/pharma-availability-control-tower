@@ -8,10 +8,10 @@ This repository contains a 7-day MVP for a planner-facing pharma dispatch contro
    - fetches vessel manifests from a database snapshot reader
    - fetches warehouse stock, DC stock, sales history, and lorry state from database readers
    - fetches vessel ETA from a mock API
-2. **Decision engines**
+2. **Decision engines (User-Triggered)**
    - `M1` scores shipment-SKU priority
-   - `M2` generates DC requests from stock and sales snapshots
-   - `M3` builds and ranks candidate dispatch plans
+   - `M2` generates DC requests analyzing 48-hour sales forecasts against *Effective DC Stock* (physical + in-transit)
+   - `M3` builds candidate 48-hour dispatch plans restricted to 1 trip per available lorry
 3. **Planner console**
    - shows read-only inputs, engine outputs, plan comparison, approval, rejection, and overrides
 4. **Demo state simulation**
@@ -27,13 +27,14 @@ Until the real engines are connected, the platform layer may use contract-compat
 - 15 SKUs
 - 1 warehouse
 - 5 DCs
-- 8 lorries total
+- 8 lorries total (Binary state: `available` or `unavailable`)
   - 5 normal
   - 3 reefer
-- maximum 2 stops per lorry
+- single trip per lorry per 48-hour planning horizon
+- maximum 2 stops per lorry trip
 - fixed route time and cost graph
-- ETA refresh every 2 hours from the mock API
 - manifest, stock, sales, and lorry inputs come from snapshot readers
+- models run on-demand via planner UI (no background polling)
 - approved plan versions are immutable
 
 ## Core Rules
@@ -43,9 +44,9 @@ Until the real engines are connected, the platform layer may use contract-compat
 - `quantity` stays on manifest lines, stock snapshots, requests, and plan items.
 - `capacity_unit` is used for lorry capacity and load feasibility.
 - M1 scores per shipment-SKU line, and the UI also shows an aggregated SKU summary.
-- The planner may change lorry choice, stop order, and quantities before approval.
-- After approval, that plan version is frozen permanently.
-- Any later change requires a new plan version.
+- The planner may change lorry choice, stop order, and quantities.
+- **Overrides** must pass a strict math-bound API validation (capacity, effective warehouse stock, reefer compatibility) before they can be frozen.
+- After approval, that plan version is frozen permanently and directly updates the DB with Warehouse reservations and DC in-transit records.
 
 ## Engine Contracts
 
@@ -65,8 +66,8 @@ Until the real engines are connected, the platform layer may use contract-compat
 
 ### M2 - DC Request Generator
 **Inputs**
-- DC stock snapshot
-- sales history snapshot
+- Effective DC stock (Physical + In-Transit)
+- 48-hour sales forecast
 
 **Outputs**
 - `dc_request`
@@ -99,29 +100,26 @@ The frontend is a planner-only console with these views:
 - `Demo State` for reservation, in-transit, and simulated stock updates
 - `Reports` for approved plan exports and audit views
 
-## Demo State Boundary
+## Ghost Inventory & Demo State
 
-`M1`, `M2`, and `M3` never mutate business stock. They only read snapshots and produce outputs.
+`M1`, `M2`, and `M3` are stateless and never mutate business stock directly. They rely entirely on **Effective Stock** calculated by the platform layer.
 
-The separate `demo_state` module exists only so the demo can show state progression:
+- **Option A (Effective Stock):** When a plan is approved, the database directly logs `demo_reservations` (Warehouse) and `demo_transfers` (DC). Future snapshot reads calculate `Effective WH Stock = Physical - Reserved` and `Effective DC Stock = Physical + In-Transit`.
 
-1. planner approves a plan
-2. demo reservation state is created
-3. simulated arrival applies warehouse decrement and DC increment
-4. later engine runs consume the updated snapshots
+To simulate physical movement without building complex UIs, physical increments are handled via **Backend Scripts**:
+1. `simulate_vessel_arrival.py` -> Converts manifest lines into physical warehouse stock increments.
+2. `simulate_lorry_arrival.py` -> Closes an active transfer, removes warehouse reservations, and increments physical DC stock.
 
-This is local demo behavior, not enterprise transaction ownership.
+## High-Level Flow (User-Triggered)
 
-## High-Level Flow
-
-1. Readers fetch manifest, warehouse stock, DC stock, sales history, and lorry snapshots.
-2. ETA provider refreshes vessel ETA from the mock API.
-3. `M2` generates daily DC requests.
+1. Planner clicks "Generate Plan" in the UI.
+2. Readers fetch Effective Warehouse stock, Effective DC stock, sales forecasts, and binary lorry availability.
+3. `M2` generates 48-hour DC shortage requests.
 4. `M1` scores shipment-line priority.
-5. `M3` generates and ranks candidate dispatch plans.
-6. Planner reviews, edits, approves, rejects, or overrides a draft plan.
-7. `demo_state` creates reservation state on approval.
-8. `demo_state` simulates arrival and updates demo warehouse/DC stock.
+5. `M3` generates 48-hour candidate dispatch plans (1 trip per lorry).
+6. Planner reviews, overrides (triggering math-bound validation check), and approves.
+7. System updates DB tables with reserved/in-transit states and freezes the plan.
+8. (For Demo) CLI scripts simulate real-world arrival events, updating physical stocks.
 
 ## Tech Stack
 

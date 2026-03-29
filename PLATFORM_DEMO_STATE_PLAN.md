@@ -23,9 +23,9 @@ This plan covers everything outside `M1`, `M2`, and `M3`:
 - ORM and migrations: `SQLAlchemy 2.x`, `Alembic`, `PyMySQL`
 - Database shape: one local database named `control_tower_mvp`
 - Storage rules:
-  - input snapshots are append-only
+  - inputs are read on-demand
   - approved plan versions are immutable
-  - demo-state records derive only from approved plan versions
+  - effective stock perfectly reconciles physical DB inventory with approved plan reservations/in-transit records
 - Bridge rule: contract-compatible stubs may stand in for `M1`, `M2`, and `M3` until the real engines are connected
 
 ## Sequential Delivery Steps
@@ -89,15 +89,15 @@ This plan covers everything outside `M1`, `M2`, and `M3`:
   - urgent DC shortage
   - fleet limitation with reefer pressure
 
-### 7. Build inbound snapshot readers
+### 7. Build inbound snapshot readers ("Effective" Engine)
 - implement `manifest_reader`
-- implement `warehouse_stock_reader`
-- implement `dc_stock_reader`
-- implement `sales_history_reader`
-- implement `lorry_state_reader`
+- implement `warehouse_stock_reader` (Calculates: Physical - Reserved)
+- implement `dc_stock_reader` (Calculates: Physical + In-Transit)
+- implement `sales_history_reader` (Calculates 48-hour shortage forecast)
+- implement `lorry_state_reader` (Exposes simple binary Available/Unavailable states)
 - each reader must support:
-  - fetch latest snapshot
-  - fetch snapshot by id or time
+  - executing immediately on planner "Generate Plan" clicks
+  - returning normalized engine-ready contracts
   - normalize raw storage rows into engine-ready contracts
 
 ### 8. Build the ETA mock API and provider
@@ -131,17 +131,14 @@ This plan covers everything outside `M1`, `M2`, and `M3`:
 - add planner actions for:
   - approve plan version
   - reject plan version
-  - override by creating a new draft version
-- enforce immutability on approved plan versions
+  - override and validate (runs strict Math-Bound Check: capacity <= lorry.capacity, quantity <= effective_wh_stock)
+- enforce immutability strictly on approved plans
 
-### 12. Build demo-state services
-- create reservation records when a plan is approved
-- create transfer records per approved stop and item
-- implement deterministic arrival progression
-- on simulated arrival:
-  - reduce projected warehouse stock
-  - increase projected DC stock
-- expose demo-state read models for reservation, in-transit, completed, and projected stock views
+### 12. Build Demo CLI Simulation Scripts
+Instead of complex UIs, physical time moves forward via developer CLI running against local DB:
+- `python scripts/simulate_vessel_arrival.py` -> reads active manifests, increments physical WH DB, drops manifest.
+- `python scripts/simulate_lorry_arrival.py` -> finds active "In Transit", increments physical DC DB, drops WH reservation.
+This cleanly separates engine planning logic from physical inventory updates.
 
 ### 13. Build the planner frontend sequentially
 - build `Dashboard` first

@@ -30,19 +30,17 @@ The most important decision is architectural separation.
 - transaction behavior does not leak into model code
 - the demo can still show end-to-end state progression
 
-## Strategy 2 - Treat Inputs as Snapshots
+## Strategy 2 - Treat Inputs as "Effective" Snapshots
 
-Use stable readers for operational inputs:
+Use stable readers for operational inputs, executed *only on-demand* via user UI triggers:
 
 - `manifest_reader`
-- `warehouse_stock_reader`
-- `dc_stock_reader`
-- `sales_history_reader`
-- `lorry_state_reader`
+- `warehouse_stock_reader` (Calculates Effective = Physical - Reserved)
+- `dc_stock_reader` (Calculates Effective = Physical + In-Transit)
+- `sales_history_reader` (Projects 48-hour forecast)
+- `lorry_state_reader` (Binary: Available or Unavailable)
 
-Use `eta_provider` as the only mock API feed.
-
-This keeps ingest simple and consistent: manifest is fetched the same way as warehouse and DC stock.
+This keeps ingest simple and solves the "Ghost Inventory" double-allocation problem.
 
 ## Strategy 3 - Keep M3 Explainable
 
@@ -55,13 +53,14 @@ This keeps plan generation explainable and easier to debug.
 
 ## Strategy 4 - Narrow the MVP
 
-The MVP stays intentionally small:
+The MVP stays intentionally narrow to keep the math solvable:
 
 - 5 DCs
-- 8 lorries
-- maximum 2 stops per lorry
-- fixed route graph
-- planner-only UI
+- 8 lorries total (Binary lorry availability: Available / Unavailable)
+- 48-hour planning horizon
+- 1 guaranteed trip per lorry per plan (no complex multi-shift reuse)
+- maximum 2 stops per lorry route
+- planner-only UI triggered on-demand
 
 Smaller scope makes the dispatch output easier to trust and demo.
 
@@ -70,9 +69,11 @@ Smaller scope makes the dispatch output easier to trust and demo.
 The planner can:
 
 - review input snapshots
+- request model execution ("Generate Plan")
 - review M1, M2, and M3 outputs
-- edit lorry choice, stop order, and quantities before approval
-- approve, reject, or override a plan
+- override lorry choice, stop order, and quantities
+- **NEW**: Any override is subject to a strict Math-Bound Validation Engine (checking capacities, effective stock limits, and reefer rules) before it can be frozen.
+- approve or reject a plan
 
 Once approved, that plan version is immutable.
 
@@ -83,18 +84,11 @@ Once approved, that plan version is immutable.
 - show M1 line-level output and aggregated SKU summary
 - keep later runs dependent on new snapshots, not hidden state inside engines
 
-## Strategy 7 - Preserve Demo Credibility
+## Strategy 7 - Preserve Demo Credibility via Scripts
 
-The demo must visibly show:
+The demo must visibly show state progression without models polling databases.
 
-1. ETA refresh
-2. shortage/request generation
-3. ranked plan candidates
-4. planner approval
-5. reservation creation
-6. simulated warehouse-to-DC movement
-
-The important rule is that only the demo-state module owns steps 5 and 6.
+We handle physical movement via backend CLI scripts (e.g., `simulate_vessel_arrival.py`) that naturally update the underlying physical stock tables. When the planner next generates a plan, the M2/M3 algorithms organically react to these script-injected physical realities.
 
 ## Strategy 8 - Use Contract Stubs To Unblock Platform
 

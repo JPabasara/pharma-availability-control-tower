@@ -16,6 +16,7 @@ pharma-availability-control-tower/
 |   |   |   |-- api/v1/         # versioned HTTP routes
 |   |   |   |-- orchestration/  # coordinates readers, stubs, engines, and outputs
 |   |   |   |-- planner_flow/   # approval, rejection, override, and history flow
+|   |   |   |   `-- validation/ # math-bound checker for manual overrides
 |   |   |   |-- reporting/      # report and export assembly
 |   |   |   `-- dependencies/   # shared backend wiring helpers
 |   |   `-- tests/              # backend-focused tests
@@ -43,7 +44,7 @@ pharma-availability-control-tower/
 |   |   |-- features/           # M2 feature preparation logic
 |   |   |-- forecasting/        # demand and stock-out calculations
 |   |   |-- inference/          # M2 runtime request generation
-|   |   `-- jobs/               # scheduled M2 execution logic
+|   |   `-- execution/          # strictly on-demand M2 execution wrappers
 |   `-- m3_dispatch/            # dispatch planning engine
 |       |-- contracts/          # M3 input and output shapes
 |       |-- optimizer/          # feasible plan generation from constraints
@@ -100,7 +101,9 @@ pharma-availability-control-tower/
 |   |-- srs/                    # software requirement specs
 |   |-- architecture/           # architecture notes and decisions
 |   `-- demo/                   # demo script and scenario notes
-|-- scripts/                    # manual developer scripts and helpers
+|-- scripts/                    # CLI tools for manual ops and demo simulation
+|   |-- simulate_vessel_arrival.py # physically increments WH DB stock from manifests
+|   `-- simulate_lorry_arrival.py  # physically increments DC DB stock from in-transit
 `-- tests/                      # cross-system test suites
     |-- contract/               # interface and schema tests
     |-- integration/            # multi-module integration tests

@@ -32,13 +32,17 @@ By the end of day 7, the demo must show:
 - 15 SKUs
 - 1 warehouse
 - 5 DCs
-- 8 lorries total
+- 48-hour planning horizon
+- 1 trip per lorry per plan
+- 8 lorries total (Binary: Available/Unavailable)
   - 5 normal
   - 3 reefer
 - maximum 2 stops per lorry
 - fixed route times and costs
 - `capacity_unit` for lorry/load feasibility
 - planner-only frontend
+- pure Math validation for planner overrides
+- CLI scripts for demo time progression
 
 ## Platform Defaults
 
@@ -48,11 +52,11 @@ By the end of day 7, the demo must show:
 
 ## Team Split
 
-### Developer 1 - Demo State Only
-- build local persistence for demo reservation and transfer simulation
-- create reservation state on approval
-- simulate arrival and warehouse/DC stock movement
-- expose demo-state projections and audit views
+### Developer 1 - Platform Data & Demo Scripts
+- build "Effective Stock" data readers (Physical +/- Reserved/In-transit)
+- build math-bound validation engine for planner overrides
+- build CLI scripts (`simulate_vessel_arrival.py`, `simulate_lorry_arrival.py`)
+- expose demo audit views
 
 ### Developer 2 - Frontend and Planner Flow
 - build planner dashboard and read-only input views
@@ -61,14 +65,14 @@ By the end of day 7, the demo must show:
 - wire API orchestration and reporting views
 
 ### Developer 3 - M1 and M2 Only
-- implement `M1` training, inference, and score output
-- implement `M2` request generation from stock and sales snapshots
-- keep both engines isolated from planner flow and demo-state logic
+- implement `M1` inference and score output
+- implement `M2` request generation using 48-hour horizon and Effective DC Stock
+- keep both engines strictly on-demand (no polling)
 
 ### Developer 4 - M3 Only
-- implement optimizer, ranker, and candidate-plan generation
+- implement optimizer generating 48-hour plans (restricted to 1 trip per lorry)
 - expose planner-editable draft-plan contract
-- keep `M3` isolated from demo-state and transaction simulation
+- keep `M3` completely isolated from physical simulation
 
 ## Workstreams
 
@@ -134,11 +138,10 @@ By the end of day 7, the demo must show:
 
 ## Acceptance Checklist
 
-- [ ] manifest comes from `manifest_reader`, not manual upload
-- [ ] ETA comes from the mock API
-- [ ] `M1`, `M2`, and `M3` never mutate stock
-- [ ] planner can edit draft plans before approval
-- [ ] approved plan versions are immutable
-- [ ] `demo_state` creates reservation on approval
-- [ ] `demo_state` updates demo warehouse and DC stock on simulated arrival
+- [ ] models execute strictly on-demand via planner UI triggers
+- [ ] `M1`, `M2`, `M3` read *Effective Stock*, preventing ghost inventory double-allocation
+- [ ] planner overrides successfully pass/fail via a Math-Bound Validation execution
+- [ ] M3 outputs exactly 1 trip per available lorry for the 48-hour horizon
+- [ ] approved plan versions are immutable and immediately write DB reservations
+- [ ] simulated arrival scripts physically increment/decrement stock tables
 - [ ] planner can view history and reports from the same console
