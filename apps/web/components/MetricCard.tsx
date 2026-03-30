@@ -7,7 +7,7 @@ export function MetricCard({
   label: string;
   value: string;
   detail: string;
-  accent?: "teal" | "amber" | "ink" | "rose";
+  accent?: "teal" | "amber" | "ink" | "rose" | "primary";
 }) {
   return (
     <article className={`metric-card metric-card-${accent}`}>

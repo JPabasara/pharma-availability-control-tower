@@ -12,6 +12,7 @@ import { MetricCard } from "@/components/MetricCard";
 import { PageHeader } from "@/components/PageHeader";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -92,7 +93,7 @@ export default function DashboardPage() {
               label="Active Manifests"
               value={formatInteger(summary.active_manifests)}
               detail="Inbound manifests still influencing planner priorities."
-              accent="ink"
+              accent="primary"
             />
           </div>
 
@@ -133,19 +134,58 @@ export default function DashboardPage() {
               title="Fleet Status"
               description="Availability from the latest lorry-state snapshot."
             >
-              <div className="cards-grid">
-                <div className="list-card">
-                  <h4>{formatInteger(summary.fleet_status.available)} available</h4>
-                  <p>
-                    {formatInteger(summary.fleet_status.normal_available)} normal and{" "}
-                    {formatInteger(summary.fleet_status.reefer_available)} reefer lorries are currently ready.
-                  </p>
+              <div className="split-layout" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "center" }}>
+                <div style={{ width: "100%", height: 240 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Normal Available', value: summary.fleet_status.normal_available, color: 'var(--color-teal)' },
+                          { name: 'Reefer Available', value: summary.fleet_status.reefer_available, color: 'var(--color-primary)' },
+                          { name: 'Unavailable', value: summary.fleet_status.unavailable, color: 'var(--color-ink-muted)' },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {[
+                          { name: 'Normal Available', value: summary.fleet_status.normal_available, color: 'var(--color-teal)' },
+                          { name: 'Reefer Available', value: summary.fleet_status.reefer_available, color: 'var(--color-primary)' },
+                          { name: 'Unavailable', value: summary.fleet_status.unavailable, color: 'var(--color-border-hover)' },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'var(--color-surface)', 
+                          borderColor: 'var(--color-border)',
+                          borderRadius: '8px',
+                          color: 'var(--color-ink)'
+                        }} 
+                        itemStyle={{ color: 'var(--color-ink)' }} 
+                      />
+                      <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: 'var(--color-ink-soft)', fontSize: '0.85rem' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="list-card">
-                  <h4>{formatInteger(summary.fleet_status.unavailable)} unavailable</h4>
-                  <p>
-                    Total fleet size is {formatInteger(summary.fleet_status.total)} vehicles across the 48-hour planning horizon.
-                  </p>
+                <div className="cards-grid" style={{ gridTemplateColumns: "1fr" }}>
+                  <div className="list-card">
+                    <h4>{formatInteger(summary.fleet_status.available)} available</h4>
+                    <p>
+                      {formatInteger(summary.fleet_status.normal_available)} normal and{" "}
+                      {formatInteger(summary.fleet_status.reefer_available)} reefer lorries are currently ready.
+                    </p>
+                  </div>
+                  <div className="list-card">
+                    <h4>{formatInteger(summary.fleet_status.unavailable)} unavailable</h4>
+                    <p>
+                      Total fleet size is {formatInteger(summary.fleet_status.total)} vehicles across the 48-hour planning horizon.
+                    </p>
+                  </div>
                 </div>
               </div>
             </SectionCard>

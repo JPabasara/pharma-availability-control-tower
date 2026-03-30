@@ -2,53 +2,91 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { 
+  Activity, 
+  BarChart3, 
+  ClipboardList, 
+  Clock, 
+  Database, 
+  FileText, 
+  LayoutDashboard, 
+  Moon, 
+  Sun,
+  Truck
+} from "lucide-react";
 
 import { buildQueryString } from "@/lib/format";
 import { usePlannerRunContext } from "@/lib/run-context";
+import { useTheme } from "@/lib/theme-context";
 
-const NAV_ITEMS: Array<{
+import { AlertCircle } from "lucide-react";
+
+type NavItem = {
   href: string;
   label: string;
+  icon: any; // Using any for simplicity with lucide icons, or React.ElementType
   useRunContext?: boolean;
-}> = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/inputs", label: "Inputs" },
-  { href: "/priorities", label: "M1 Priorities", useRunContext: true },
-  { href: "/requests", label: "M2 Requests", useRunContext: true },
-  { href: "/dispatch", label: "M3 Dispatch", useRunContext: true },
-  { href: "/history", label: "History" },
-  { href: "/demo-state", label: "Demo State" },
-  { href: "/reports", label: "Reports" },
-] as const;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/inputs", label: "Inputs", icon: Database },
+  { href: "/priorities", label: "M1 Priorities", useRunContext: true, icon: AlertCircle },
+  { href: "/requests", label: "M2 Requests", useRunContext: true, icon: ClipboardList },
+  { href: "/dispatch", label: "M3 Dispatch", useRunContext: true, icon: Truck },
+  { href: "/history", label: "History", icon: Clock },
+  { href: "/demo-state", label: "Demo State", icon: Activity },
+  { href: "/reports", label: "Reports", icon: FileText },
+];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { runContext } = usePlannerRunContext();
+  const { theme, toggleTheme } = useTheme();
+  
+  const [time, setTime] = useState("");
+
+  useEffect(() => {
+    // Client-side only time to avoid hydration mismatch
+    setTime(new Date().toLocaleTimeString());
+    const timer = setInterval(() => {
+      setTime(new Date().toLocaleTimeString());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="sidebar-eyebrow">Planner Console</span>
-          <h1>Pharma Control Tower</h1>
-          <p>On-demand dispatch planning with demo-state visibility.</p>
+          <div className="brand-icon">
+            <Activity size={20} />
+          </div>
+          <div className="brand-text-wrapper">
+            <span className="sidebar-eyebrow">Planner Console</span>
+            <h1>Pharma Tower</h1>
+          </div>
         </div>
 
+        <div className="nav-section-title">Menu</div>
         <nav className="nav-list" aria-label="Primary navigation">
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.href;
             const href = item.useRunContext
               ? `${item.href}${buildQueryString(runContext)}`
               : item.href;
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={href}
                 className={`nav-link${active ? " nav-link-active" : ""}`}
               >
+                <Icon size={18} />
                 <span className="nav-link-label">{item.label}</span>
                 {item.useRunContext && runContext?.m3RunId ? (
-                  <span className="nav-link-meta">Linked to latest run</span>
+                  <span className="nav-link-meta">M3 Linked</span>
                 ) : null}
               </Link>
             );
@@ -56,17 +94,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-chip">
-            FastAPI at {process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"}
-          </div>
-          <p className="sidebar-note">
-            Arrival simulation stays CLI-driven. This console visualizes the resulting
-            state.
-          </p>
+          <Database size={14} className="subtle-text" />
+          <span>API: {process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"}</span>
         </div>
       </aside>
 
-      <main className="content">{children}</main>
+      <div className="main-wrapper">
+        <header className="top-header">
+          <div className="live-clock">
+            <Clock size={16} />
+            {time || "--:--:--"}
+          </div>
+          <div className="live-indicator">
+            <span className="live-dot" />
+            SYSTEM ONLINE
+          </div>
+          <button 
+            className="theme-toggle" 
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </header>
+
+        <main className="content">{children}</main>
+      </div>
     </div>
   );
 }
