@@ -1,19 +1,19 @@
 Full Platform Build — Task Tracker
 Macro-Phase A: Backend Services
- Package inits for integrations
- manifest_reader
- warehouse_stock_reader
- dc_stock_reader
- sales_history_reader
- lorry_state_reader
- eta_provider
- M1 stub
- M2 stub
- M3 stub
- Engine bridge
- Orchestration service
- Planner flow service + math-bound validation
- Demo state service
+ [x] Package inits for integrations
+ [x] manifest_reader
+ [x] warehouse_stock_reader
+ [x] dc_stock_reader
+ [x] sales_history_reader
+ [x] lorry_state_reader
+ [x] eta_provider
+ [x] M1 stub
+ [x] M2 stub
+ [x] M3 stub
+ [x] Engine bridge
+ [x] Orchestration service
+ [x] Planner flow service + math-bound validation
+ [x] Demo state service
 Macro-Phase B: FastAPI Routes
  main.py (app + CORS)
  /api/v1/inputs
