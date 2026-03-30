@@ -129,6 +129,33 @@ To simulate physical movement without building complex UIs, physical increments 
 - ML: Python, XGBoost, scikit-learn
 - Optimization: Google OR-Tools
 
+## Run Locally
+
+### Backend
+
+1. Start MySQL: `docker compose up -d mysql`
+2. Reset and seed the database: `python scripts/reset_db.py`
+3. Run the API: `.venv\Scripts\python -m uvicorn apps.api.app.main:app --reload --port 8000`
+
+### Frontend
+
+1. Install dependencies: `cd apps\web && npm install`
+2. Set `NEXT_PUBLIC_API_BASE_URL` if needed
+   - default local value: `http://127.0.0.1:8000`
+   - see `apps/web/.env.example`
+3. Start the planner console: `cd apps\web && npm run dev`
+
+### Demo Flow
+
+1. Open `http://127.0.0.1:3000/dashboard`
+2. Generate a plan from `M3 Dispatch`
+3. Review `M1 Priorities` and `M2 Requests`
+4. Override, approve, or reject from `M3 Dispatch`
+5. Inspect `History`, `Demo State`, and `Reports`
+6. Simulate arrivals with:
+   - `python scripts/simulate_vessel_arrival.py`
+   - `python scripts/simulate_lorry_arrival.py`
+
 ## Platform Delivery Note
 
 - Outside-engine platform work, local MySQL setup, integration readers, ETA mock API, planner flow, demo-state simulation, and engine stubs are planned in `PLATFORM_DEMO_STATE_PLAN.md`.
