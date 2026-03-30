@@ -1,0 +1,31 @@
+﻿============================================================
+Phase C ù Full End-to-End Verification
+============================================================
+
+[Step 1] Re-activating manifests for test...
+  [PASS] Re-activated 2 manifests
+
+[Step 2] Running vessel arrival simulation...
+  [PASS] Vessel arrival executed
+  [PASS] Vessels arrived: 2
+  [PASS] WH physical stock increased after vessel arrival
+  [PASS] Manifests marked as arrived: 2
+  [PASS] Vessel arrival events created: 10
+
+[Step 3] Generating and approving a plan...
+  [PASS] Plan generated
+  [PASS] Plan approved
+  [FAIL] In-transit transfers created: 0
+  [FAIL] Active WH reservations created: 0
+
+[Step 4] Running lorry arrival simulation...
+  [PASS] Lorry arrival executed
+  [FAIL] Transfers arrived: 0
+  [PASS] All transfers arrived (none still in_transit)
+  [PASS] WH reservations released
+  [PASS] Lorry arrival events created: 1
+
+============================================================
+Results: 12/15 passed, 3 failed
+PHASE C VERIFICATION FAILED
+============================================================
