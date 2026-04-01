@@ -1,4 +1,4 @@
-"""Alembic environment configuration for MySQL migrations."""
+"""Alembic environment configuration for the configured SQLAlchemy database."""
 
 import os
 import sys
