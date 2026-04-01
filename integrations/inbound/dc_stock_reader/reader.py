@@ -104,7 +104,7 @@ def to_contract(session: Session, snapshot: DCStockSnapshot) -> dict:
     items = []
     for item in snapshot.items:
         sku = session.query(SKU).filter(SKU.id == item.sku_id).first()
-        in_transit = live_in_transit.get((snapshot.dc_id, item.sku_id), 0)
+        in_transit = item.in_transit_quantity + live_in_transit.get((snapshot.dc_id, item.sku_id), 0)
         effective = item.physical_quantity + in_transit
 
         items.append({

@@ -1,147 +1,86 @@
-# Project Plan - 7-Day MVP
+# Project Plan
 
-## Goal
+## Summary
 
-Deliver a working planner-facing MVP that:
+The project has moved beyond the original 7-day MVP planning state. The platform, persistence layer, planner console, and demo operations baseline are now implemented locally and working together. This document now tracks current delivery status and the next milestones needed to finish the product.
 
-- fetches manifests, stock, sales, and lorry state as snapshots
-- fetches ETA from a mock API
-- runs `M1`, `M2`, and `M3` as pure engines
-- lets the planner review, edit, approve, reject, and override plans
-- simulates reservation and stock movement in a separate demo-only state module
-- uses local MySQL through Docker for MVP persistence
-- uses contract stubs to keep the platform and planner flow usable until the real engines are plugged in
+## Current Delivery Status
 
-## Success Criteria
+### Platform baseline
 
-By the end of day 7, the demo must show:
+Completed:
 
-1. manifest snapshots fetched from the source database reader
-2. warehouse, DC, sales, and lorry snapshots fetched from readers
-3. ETA updates from the mock API
-4. M1 ranked shipment-line priorities and aggregated SKU summary
-5. M2 generated DC requests
-6. M3 candidate dispatch plans with one selected best plan
-7. planner edit, approve, reject, and override flow
-8. approval creating demo reservation state
-9. simulated arrival updating demo warehouse and DC stock
-10. immutable approved plan history and audit trail
+- local MySQL 8 setup through Docker
+- Alembic migrations and reset/seed workflow
+- deterministic demo data for SKUs, DCs, lorries, manifests, ETAs, and stock
+- backend readers for manifests, warehouse stock, DC stock, sales history, lorry horizon, and ETAs
+- orchestration and engine-run persistence
 
-## Locked Scope
+### Planner application
 
-- 15 SKUs
-- 1 warehouse
-- 5 DCs
+Completed:
+
+- planner-only Next.js frontend
+- dashboard, inputs, M1 priorities, M2 requests, M3 dispatch, history, demo operations, and reports
+- plan comparison, run-based plan detail, override, approve, reject, and audit trail flows
+- local run-context persistence across the planner workflow
+
+### Demo operations and execution
+
+Completed:
+
+- stop-scoped reservations and transfers on approval
+- date-based lorry day assignments
+- manifest CSV upload and manifest arrival
+- DC sale posting
+- lorry availability control for the next 2 planning days
+- stop arrival execution that releases matching reservations and moves stock physically
+
+### Engine integration posture
+
+Current state:
+
+- platform contracts are in place
+- stub-compatible `M1`, `M2`, and `M3` integration path exists
+- real engine replacement is still pending
+
+## Current Product Rules
+
 - 48-hour planning horizon
-- 1 trip per lorry per plan
-- 8 lorries total (Binary: Available/Unavailable)
-  - 5 normal
-  - 3 reefer
-- maximum 2 stops per lorry
-- fixed route times and costs
-- `capacity_unit` for lorry/load feasibility
-- planner-only frontend
-- pure Math validation for planner overrides
-- CLI scripts for demo time progression
+- run-based M3 plans with `dispatch_day`
+- one lorry may be assigned once on Day 1 and once on Day 2
+- maximum 2 stops per run
+- M2 uses trailing 30-day sales history for forecast input
+- lorry availability is horizon-based, not binary-only across the whole plan
+- planner approval creates overlays, not direct physical stock movement
 
-## Platform Defaults
+## Remaining Milestones
 
-- MySQL 8 in Docker is the default local database setup.
-- One local MySQL database stores snapshots, planner decisions, engine runs, demo-state data, and audit data.
-- Contract stubs may stand in for `M1`, `M2`, and `M3` until the real engines are connected.
+### Milestone 1: Real engine integration
 
-## Team Split
+- replace stub `M1` with real scoring logic
+- replace stub `M2` with real request-generation logic
+- replace stub `M3` with the real optimizer/ranker
+- keep the existing planner and API contracts stable while swapping implementations
 
-### Developer 1 - Platform Data & Demo Scripts
-- build "Effective Stock" data readers (Physical +/- Reserved/In-transit)
-- build math-bound validation engine for planner overrides
-- build CLI scripts (`simulate_vessel_arrival.py`, `simulate_lorry_arrival.py`)
-- expose demo audit views
+### Milestone 2: Hosted environment
 
-### Developer 2 - Frontend and Planner Flow
-- build planner dashboard and read-only input views
-- build M1, M2, M3 result pages
-- build plan comparison, edit, approval, rejection, and override UI
-- wire API orchestration and reporting views
+- deploy frontend
+- deploy backend
+- deploy cloud MySQL
+- finalize production config such as CORS, environment variables, and hosted database wiring
 
-### Developer 3 - M1 and M2 Only
-- implement `M1` inference and score output
-- implement `M2` request generation using 48-hour horizon and Effective DC Stock
-- keep both engines strictly on-demand (no polling)
+### Milestone 3: CI/CD and release flow
 
-### Developer 4 - M3 Only
-- implement optimizer generating 48-hour plans (restricted to 1 trip per lorry)
-- expose planner-editable draft-plan contract
-- keep `M3` completely isolated from physical simulation
+- add GitHub Actions for backend checks and frontend build
+- auto-deploy on merge to `main`
+- protect `main`
+- make real-engine merges flow through the same deployment pipeline
 
-## Workstreams
+## Immediate Next Step
 
-### Stream A - Inputs and orchestration
-- local MySQL setup and migrations
-- snapshot storage
-- manifest snapshot reader
-- warehouse stock reader
-- DC stock reader
-- sales history reader
-- lorry state reader
-- ETA provider
-- API orchestration for planner views
-- contract-compatible stub orchestration for engine outputs
+The next practical delivery sequence is:
 
-### Stream B - Engines
-- `M1` priority scoring
-- `M2` request generation
-- `M3` optimization and ranking
-
-### Stream C - Planner console
-- input pages
-- engine result pages
-- dispatch editing and approval flow
-- history and report pages
-
-### Stream D - Demo state simulation
-- reservation state
-- transfer state
-- arrival simulator
-- post-approval stock projections
-
-## Delivery Sequence
-
-### Day 1
-- freeze docs, contracts, rules, and repo structure
-- generate folder skeleton
-
-### Day 2
-- set up local MySQL, migrations, snapshot readers, and ETA mock integration
-- seed data and route graph
-
-### Day 3
-- implement `M1`
-- add contract stubs where platform work must proceed before real engine hookup
-- start planner priority view
-
-### Day 4
-- implement `M2`
-- connect request views
-
-### Day 5
-- implement `M3` optimizer and ranker
-- expose candidate plans
-
-### Day 6
-- implement planner edit, approve, reject, and override flow
-- implement demo reservation and simulated arrival flow
-
-### Day 7
-- harden demo scenarios
-- finalize audit trail, reports, and documentation
-
-## Acceptance Checklist
-
-- [ ] models execute strictly on-demand via planner UI triggers
-- [ ] `M1`, `M2`, `M3` read *Effective Stock*, preventing ghost inventory double-allocation
-- [ ] planner overrides successfully pass/fail via a Math-Bound Validation execution
-- [ ] M3 outputs exactly 1 trip per available lorry for the 48-hour horizon
-- [ ] approved plan versions are immutable and immediately write DB reservations
-- [ ] simulated arrival scripts physically increment/decrement stock tables
-- [ ] planner can view history and reports from the same console
+1. plug in real `M1`, `M2`, and `M3`
+2. deploy the system using Vercel + Railway
+3. add CI/CD so merged engine changes auto-integrate into the hosted system

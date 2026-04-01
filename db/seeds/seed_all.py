@@ -209,20 +209,22 @@ def seed_dc_stock(session) -> int:
 
 
 def seed_sales_history(session) -> int:
-    """Seed 7 days of sales history."""
+    """Seed 30 days of sales history by repeating the seeded weekly pattern."""
     rows = read_csv("sales_history.csv")
+    total_rows = 0
     for row in rows:
-        session.add(SalesHistoryRecord(
-            dc_id=int(row["dc_id"]),
-            sku_id=int(row["sku_id"]),
-            sale_date=datetime.strptime(row["sale_date"], "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            ),
-            quantity_sold=int(row["quantity_sold"]),
-        ))
+        base_date = datetime.strptime(row["sale_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        for offset_days in (0, 7, 14, 21):
+            session.add(SalesHistoryRecord(
+                dc_id=int(row["dc_id"]),
+                sku_id=int(row["sku_id"]),
+                sale_date=base_date - timedelta(days=offset_days),
+                quantity_sold=int(row["quantity_sold"]),
+            ))
+            total_rows += 1
     session.commit()
-    print(f"  Seeded {len(rows)} sales history records.")
-    return len(rows)
+    print(f"  Seeded {total_rows} sales history records.")
+    return total_rows
 
 
 def seed_manifests(session) -> int:
@@ -231,6 +233,7 @@ def seed_manifests(session) -> int:
 
     # Vessel 1 — arrives at DEMO_NOW + 6 hours
     manifest1 = ManifestSnapshot(
+        manifest_name="Inbound Manifest Alpha",
         vessel_id=1,
         snapshot_time=DEMO_NOW - timedelta(hours=2),
         status="active",
@@ -250,6 +253,7 @@ def seed_manifests(session) -> int:
 
     # Vessel 2 — arrives at DEMO_NOW + 24 hours (overlapping scenario)
     manifest2 = ManifestSnapshot(
+        manifest_name="Inbound Manifest Beta",
         vessel_id=2,
         snapshot_time=DEMO_NOW - timedelta(hours=1),
         status="active",

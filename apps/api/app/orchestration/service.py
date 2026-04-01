@@ -24,6 +24,7 @@ from storage.models import (
     M1Result,
     M2Request,
     M3PlanVersion,
+    M3PlanRun,
     M3PlanStop,
     M3PlanItem,
     RouteEdge,
@@ -196,22 +197,31 @@ def generate_plan(session: Session) -> dict:
         # Store plan_version_id back for the response
         plan["plan_version_id"] = plan_version.id
 
-        for stop_data in plan.get("stops", []):
-            stop = M3PlanStop(
+        runs = plan.get("runs") or _legacy_stops_to_runs(plan.get("stops", []))
+        for run_data in runs:
+            plan_run = M3PlanRun(
                 plan_version_id=plan_version.id,
-                lorry_id=stop_data["lorry_id"],
-                stop_sequence=stop_data["stop_sequence"],
-                dc_id=stop_data["dc_id"],
+                lorry_id=run_data["lorry_id"],
+                dispatch_day=run_data.get("dispatch_day", 1),
             )
-            session.add(stop)
+            session.add(plan_run)
             session.flush()
 
-            for item_data in stop_data.get("items", []):
-                session.add(M3PlanItem(
-                    plan_stop_id=stop.id,
-                    sku_id=item_data["sku_id"],
-                    quantity=item_data["quantity"],
-                ))
+            for stop_data in run_data.get("stops", []):
+                stop = M3PlanStop(
+                    plan_run_id=plan_run.id,
+                    stop_sequence=stop_data["stop_sequence"],
+                    dc_id=stop_data["dc_id"],
+                )
+                session.add(stop)
+                session.flush()
+
+                for item_data in stop_data.get("items", []):
+                    session.add(M3PlanItem(
+                        plan_stop_id=stop.id,
+                        sku_id=item_data["sku_id"],
+                        quantity=item_data["quantity"],
+                    ))
 
     m3_run.completed_at = datetime.now(timezone.utc)
     m3_run.status = "completed"
@@ -230,3 +240,25 @@ def generate_plan(session: Session) -> dict:
         "m3_plans": m3_plans,
         "input_snapshot_ids": input_snapshot_ids,
     }
+
+
+def _legacy_stops_to_runs(stops: list[dict]) -> list[dict]:
+    """Convert legacy flat stop payloads into day-1 runs grouped by lorry."""
+    grouped: dict[int, dict] = {}
+    for stop in stops:
+        group = grouped.setdefault(
+            stop["lorry_id"],
+            {
+                "lorry_id": stop["lorry_id"],
+                "registration": stop.get("registration", "UNKNOWN"),
+                "lorry_type": stop.get("lorry_type", "unknown"),
+                "dispatch_day": stop.get("dispatch_day", 1),
+                "stops": [],
+            },
+        )
+        group["stops"].append({
+            "dc_id": stop["dc_id"],
+            "stop_sequence": stop["stop_sequence"],
+            "items": stop.get("items", []),
+        })
+    return list(grouped.values())

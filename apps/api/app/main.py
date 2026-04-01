@@ -12,6 +12,7 @@ from apps.api.app.api.v1 import (
     orchestration,
     planner,
     demo_state,
+    demo_operations,
     reports,
     mock_eta,
     dashboard,
@@ -40,6 +41,7 @@ app.include_router(inputs.router)
 app.include_router(orchestration.router)
 app.include_router(planner.router)
 app.include_router(demo_state.router)
+app.include_router(demo_operations.router)
 app.include_router(reports.router)
 app.include_router(mock_eta.router)
 app.include_router(dashboard.router)

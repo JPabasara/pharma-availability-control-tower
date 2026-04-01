@@ -3,22 +3,28 @@ import type {
   ArrivalEventsResponse,
   AuditTrailResponse,
   DashboardSummary,
+  DcSaleResponse,
   DcStockResponse,
   EngineRunsResponse,
   EtaResponse,
   GeneratePlanResponse,
   LorryStateContract,
+  LorryAvailabilityResponse,
   M1ResultsResponse,
   M2RequestsResponse,
   M3PlanDetail,
   M3PlansResponse,
+  ManifestArrivalResponse,
+  ManifestUploadResponse,
   ManifestResponse,
+  OpenExecutionStopsResponse,
   OverrideActionResponse,
-  OverrideStopPayload,
+  OverrideRunPayload,
   PlannerActionResponse,
   ReservationsResponse,
   SalesHistoryResponse,
   StockSummary,
+  StopArrivalResponse,
   TransfersResponse,
   WarehouseStockContract,
 } from "@/lib/types";
@@ -111,13 +117,17 @@ async function apiFetch<T>(
   init?: RequestInit,
   query?: Record<string, string | number | undefined | null>
 ) {
+  const headers = new Headers(init?.headers ?? {});
+  const hasBody = init?.body !== undefined && init?.body !== null;
+  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  if (hasBody && !isFormData && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(buildUrl(path, query), {
     cache: "no-store",
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -197,7 +207,7 @@ export function rejectPlan(planVersionId: number, notes: string) {
   });
 }
 
-export function overridePlan(planVersionId: number, changes: OverrideStopPayload[], notes: string) {
+export function overridePlan(planVersionId: number, changes: OverrideRunPayload[], notes: string) {
   return apiFetch<OverrideActionResponse>(`/api/v1/planner/override/${planVersionId}`, {
     method: "POST",
     body: JSON.stringify({
@@ -230,4 +240,45 @@ export function getStockSummary() {
 
 export function getArrivalEvents() {
   return apiFetch<ArrivalEventsResponse>("/api/v1/demo-state/arrival-events");
+}
+
+export function uploadManifest(formData: FormData) {
+  return apiFetch<ManifestUploadResponse>("/api/v1/demo-operations/manifests/upload", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function arriveManifest(manifestId: number) {
+  return apiFetch<ManifestArrivalResponse>(`/api/v1/demo-operations/manifests/${manifestId}/arrive`, {
+    method: "POST",
+  });
+}
+
+export function postDcSale(dc_id: number, sku_id: number, quantity: number) {
+  return apiFetch<DcSaleResponse>("/api/v1/demo-operations/dc-sales", {
+    method: "POST",
+    body: JSON.stringify({ dc_id, sku_id, quantity, actor: "planner-ui" }),
+  });
+}
+
+export function getLorryHorizon() {
+  return apiFetch<LorryStateContract>("/api/v1/demo-operations/lorries/horizon");
+}
+
+export function setLorryAvailability(lorryId: number, status: "available" | "unavailable") {
+  return apiFetch<LorryAvailabilityResponse>(`/api/v1/demo-operations/lorries/${lorryId}/availability`, {
+    method: "POST",
+    body: JSON.stringify({ status, actor: "planner-ui" }),
+  });
+}
+
+export function getOpenExecutionStops() {
+  return apiFetch<OpenExecutionStopsResponse>("/api/v1/demo-operations/execution/open-stops");
+}
+
+export function arriveExecutionStop(planStopId: number) {
+  return apiFetch<StopArrivalResponse>(`/api/v1/demo-operations/execution/stops/${planStopId}/arrive`, {
+    method: "POST",
+  });
 }

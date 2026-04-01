@@ -80,6 +80,7 @@ def to_contract(session: Session, snapshot: ManifestSnapshot) -> dict:
 
     return {
         "manifest_snapshot_id": snapshot.id,
+        "manifest_name": snapshot.manifest_name,
         "vessel_id": snapshot.vessel_id,
         "vessel_name": vessel.name if vessel else "Unknown Vessel",
         "vessel_code": vessel.code if vessel else "UNKNOWN",

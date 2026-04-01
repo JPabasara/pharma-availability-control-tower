@@ -19,6 +19,7 @@ class Settings:
     MYSQL_USER: str = os.getenv("MYSQL_USER", "ct_user")
     MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "ct_pass")
     MYSQL_ROOT_PASSWORD: str = os.getenv("MYSQL_ROOT_PASSWORD", "rootpass")
+    BUSINESS_TIMEZONE: str = os.getenv("BUSINESS_TIMEZONE", "Asia/Colombo")
 
     @property
     def DATABASE_URL(self) -> str:
