@@ -533,9 +533,25 @@ textarea {
   border-color: var(--color-border-hover);
 }
 
+.button-ghost {
+  background: transparent;
+  color: var(--color-ink-soft);
+  border-color: var(--color-border);
+}
+
+.button-ghost:hover:not(:disabled) {
+  color: var(--color-ink);
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-hover);
+}
+
 .button-danger {
   background: var(--color-rose);
   color: white;
+}
+
+.button-danger:hover:not(:disabled) {
+  filter: brightness(0.95);
 }
 
 /* Tables */
@@ -653,6 +669,99 @@ textarea {
   border: 1px solid var(--color-border);
   font-size: 0.8rem;
   color: var(--color-ink-soft);
+}
+
+.manifest-card,
+.plan-card,
+.report-card,
+.editor-run,
+.editor-stop,
+.operation-panel {
+  padding: 1.25rem;
+}
+
+.manifest-card-header,
+.plan-card-header,
+.editor-run-header,
+.editor-stop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.plan-card {
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-card-active {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.editor-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.editor-run {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  display: grid;
+  gap: 1rem;
+}
+
+.items-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.item-row {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 180px) auto;
+  align-items: end;
+}
+
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.tab-button {
+  height: 40px;
+  padding: 0 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+  color: var(--color-ink);
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-hover);
+}
+
+.tab-button-active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.operation-panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 1rem;
 }
 
 /* Forms */
@@ -791,6 +900,10 @@ textarea {
   }
   
   .split-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .item-row {
     grid-template-columns: 1fr;
   }
 }

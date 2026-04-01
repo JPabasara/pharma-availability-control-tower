@@ -25,6 +25,7 @@ from storage.models.engine_runs import (
     M1Result,
     M2Request,
     M3PlanVersion,
+    M3PlanRun,
     M3PlanStop,
     M3PlanItem,
 )
@@ -37,6 +38,7 @@ from storage.models.demo_state import (
     DemoReservation,
     DemoTransfer,
     DemoArrivalEvent,
+    DemoLorryDayState,
     DemoStockProjection,
 )
 
@@ -69,6 +71,7 @@ __all__ = [
     "M1Result",
     "M2Request",
     "M3PlanVersion",
+    "M3PlanRun",
     "M3PlanStop",
     "M3PlanItem",
     # Planner
@@ -78,6 +81,7 @@ __all__ = [
     "DemoReservation",
     "DemoTransfer",
     "DemoArrivalEvent",
+    "DemoLorryDayState",
     "DemoStockProjection",
     # Audit
     "AuditLog",

@@ -1,4 +1,4 @@
-"""Seed all demo data from CSV files into the MySQL database.
+"""Seed all demo data from CSV files into the configured database.
 
 Usage:
     python db/seeds/seed_all.py
@@ -15,8 +15,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
-from sqlalchemy import text
-from apps.api.app.dependencies.database import engine, SessionLocal
+from apps.api.app.dependencies.database import SessionLocal
 from storage.models import (
     Base,
     SKU,
@@ -51,13 +50,8 @@ def read_csv(filename: str) -> list[dict]:
 
 def clear_all_tables(session):
     """Delete all data from all business tables (preserves schema)."""
-    # Disable FK checks for clean truncation
-    session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
-
     for table in reversed(Base.metadata.sorted_tables):
         session.execute(table.delete())
-
-    session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
     session.commit()
     print("  Cleared all tables.")
 
@@ -209,20 +203,22 @@ def seed_dc_stock(session) -> int:
 
 
 def seed_sales_history(session) -> int:
-    """Seed 7 days of sales history."""
+    """Seed 30 days of sales history by repeating the seeded weekly pattern."""
     rows = read_csv("sales_history.csv")
+    total_rows = 0
     for row in rows:
-        session.add(SalesHistoryRecord(
-            dc_id=int(row["dc_id"]),
-            sku_id=int(row["sku_id"]),
-            sale_date=datetime.strptime(row["sale_date"], "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            ),
-            quantity_sold=int(row["quantity_sold"]),
-        ))
+        base_date = datetime.strptime(row["sale_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        for offset_days in (0, 7, 14, 21):
+            session.add(SalesHistoryRecord(
+                dc_id=int(row["dc_id"]),
+                sku_id=int(row["sku_id"]),
+                sale_date=base_date - timedelta(days=offset_days),
+                quantity_sold=int(row["quantity_sold"]),
+            ))
+            total_rows += 1
     session.commit()
-    print(f"  Seeded {len(rows)} sales history records.")
-    return len(rows)
+    print(f"  Seeded {total_rows} sales history records.")
+    return total_rows
 
 
 def seed_manifests(session) -> int:
@@ -231,6 +227,7 @@ def seed_manifests(session) -> int:
 
     # Vessel 1 — arrives at DEMO_NOW + 6 hours
     manifest1 = ManifestSnapshot(
+        manifest_name="Inbound Manifest Alpha",
         vessel_id=1,
         snapshot_time=DEMO_NOW - timedelta(hours=2),
         status="active",
@@ -250,6 +247,7 @@ def seed_manifests(session) -> int:
 
     # Vessel 2 — arrives at DEMO_NOW + 24 hours (overlapping scenario)
     manifest2 = ManifestSnapshot(
+        manifest_name="Inbound Manifest Beta",
         vessel_id=2,
         snapshot_time=DEMO_NOW - timedelta(hours=1),
         status="active",

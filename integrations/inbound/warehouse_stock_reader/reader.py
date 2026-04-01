@@ -77,7 +77,7 @@ def to_contract(session: Session, snapshot: WarehouseStockSnapshot) -> dict:
     items = []
     for item in snapshot.items:
         sku = session.query(SKU).filter(SKU.id == item.sku_id).first()
-        reserved = live_reserved.get(item.sku_id, 0)
+        reserved = item.reserved_quantity + live_reserved.get(item.sku_id, 0)
         effective = item.physical_quantity - reserved
 
         items.append({

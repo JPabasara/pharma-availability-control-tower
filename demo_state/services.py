@@ -15,7 +15,7 @@ from storage.models import (
     SKU,
     DC,
     Lorry,
-    M3PlanVersion,
+    M3PlanStop,
 )
 from integrations.inbound.warehouse_stock_reader import reader as wh_reader
 from integrations.inbound.dc_stock_reader import reader as dc_reader
@@ -46,6 +46,7 @@ def get_reservations(
         result.append({
             "id": r.id,
             "plan_version_id": r.plan_version_id,
+            "plan_stop_id": r.plan_stop_id,
             "sku_id": r.sku_id,
             "sku_code": sku.code if sku else "UNKNOWN",
             "sku_name": sku.name if sku else "Unknown",
@@ -79,10 +80,12 @@ def get_transfers(
         sku = session.query(SKU).filter(SKU.id == t.sku_id).first()
         dc = session.query(DC).filter(DC.id == t.dc_id).first()
         lorry = session.query(Lorry).filter(Lorry.id == t.lorry_id).first()
+        stop = session.query(M3PlanStop).filter(M3PlanStop.id == t.plan_stop_id).first() if t.plan_stop_id else None
 
         result.append({
             "id": t.id,
             "plan_version_id": t.plan_version_id,
+            "plan_stop_id": t.plan_stop_id,
             "lorry_id": t.lorry_id,
             "registration": lorry.registration if lorry else "UNKNOWN",
             "lorry_type": lorry.lorry_type if lorry else "unknown",
@@ -93,6 +96,8 @@ def get_transfers(
             "sku_code": sku.code if sku else "UNKNOWN",
             "sku_name": sku.name if sku else "Unknown",
             "quantity": t.quantity,
+            "dispatch_day": stop.dispatch_day if stop else None,
+            "stop_sequence": stop.stop_sequence if stop else None,
             "status": t.status,
             "dispatched_at": t.dispatched_at.isoformat() if t.dispatched_at else None,
             "arrived_at": t.arrived_at.isoformat() if t.arrived_at else None,

@@ -42,6 +42,7 @@ export type ManifestLine = {
 
 export type ManifestContract = {
   manifest_snapshot_id: number;
+  manifest_name: string;
   vessel_id: number;
   vessel_name: string;
   vessel_code: string;
@@ -101,7 +102,8 @@ export type SalesForecast = {
   sku_id: number;
   sku_code: string;
   sku_name: string;
-  total_sold_7d: number;
+  total_sold_30d: number;
+  lookback_days: number;
   daily_avg: number;
   forecast_48h: number;
 };
@@ -111,17 +113,28 @@ export type SalesHistoryResponse = {
   count: number;
 };
 
+export type LorryDayState = {
+  dispatch_day: number;
+  business_date: string;
+  status: string;
+  source: string;
+};
+
 export type LorryState = {
   lorry_id: number;
   registration: string;
   lorry_type: "normal" | "reefer" | string;
   capacity_units: number;
   status: string;
+  day1_status: string;
+  day2_status: string;
+  day_states: LorryDayState[];
 };
 
 export type LorryStateContract = {
   snapshot_id: number;
   snapshot_time: string;
+  planning_dates: string[];
   lorries: LorryState[];
 };
 
@@ -212,6 +225,8 @@ export type M3PlanSummary = {
   is_best: boolean;
   approved_at: string | null;
   approved_by: string | null;
+  run_count: number;
+  stop_count: number;
 };
 
 export type M3PlansResponse = {
@@ -231,15 +246,30 @@ export type M3PlanItem = {
 
 export type M3PlanStop = {
   id: number;
-  lorry_id: number;
-  registration: string;
-  lorry_type: string;
-  capacity_units: number;
   stop_sequence: number;
   dc_id: number;
   dc_code: string;
   dc_name: string;
   items: M3PlanItem[];
+};
+
+export type M3PlanFlatStop = M3PlanStop & {
+  lorry_id: number;
+  registration: string;
+  lorry_type: string;
+  capacity_units: number;
+  dispatch_day: number;
+};
+
+export type M3PlanRun = {
+  id: number;
+  lorry_id: number;
+  registration: string;
+  lorry_type: string;
+  capacity_units: number;
+  dispatch_day: number;
+  stops: M3PlanStop[];
+  total_stops: number;
 };
 
 export type M3PlanDetail = {
@@ -251,7 +281,9 @@ export type M3PlanDetail = {
   is_best: boolean;
   approved_at: string | null;
   approved_by: string | null;
-  stops: M3PlanStop[];
+  runs: M3PlanRun[];
+  stops: M3PlanFlatStop[];
+  total_runs: number;
   total_stops: number;
   total_items: number;
 };
@@ -291,13 +323,18 @@ export type GeneratePlanResponse = {
 };
 
 export type OverrideStopPayload = {
-  lorry_id: number;
   dc_id: number;
   stop_sequence: number;
   items: Array<{
     sku_id: number;
     quantity: number;
   }>;
+};
+
+export type OverrideRunPayload = {
+  lorry_id: number;
+  dispatch_day: number;
+  stops: OverrideStopPayload[];
 };
 
 export type ApprovedPlanDecision = {
@@ -321,10 +358,32 @@ export type ApprovedPlan = {
   score: number | null;
   approved_at: string | null;
   approved_by: string | null;
-  stops: Array<{
+  runs: Array<{
+    id: number;
     lorry_id: number;
     registration: string;
     lorry_type: string;
+    dispatch_day: number;
+    stops: Array<{
+      id: number;
+      stop_sequence: number;
+      dc_id: number;
+      dc_code: string;
+      dc_name: string;
+      items: Array<{
+        sku_id: number;
+        sku_code: string;
+        sku_name: string;
+        quantity: number;
+      }>;
+    }>;
+  }>;
+  stops: Array<{
+    id: number;
+    lorry_id: number;
+    registration: string;
+    lorry_type: string;
+    dispatch_day: number;
     stop_sequence: number;
     dc_id: number;
     dc_code: string;
@@ -362,6 +421,7 @@ export type AuditTrailResponse = {
 export type DemoReservation = {
   id: number;
   plan_version_id: number;
+  plan_stop_id: number | null;
   sku_id: number;
   sku_code: string;
   sku_name: string;
@@ -378,6 +438,7 @@ export type ReservationsResponse = {
 export type DemoTransfer = {
   id: number;
   plan_version_id: number;
+  plan_stop_id: number | null;
   lorry_id: number;
   registration: string;
   lorry_type: string;
@@ -388,6 +449,8 @@ export type DemoTransfer = {
   sku_code: string;
   sku_name: string;
   quantity: number;
+  dispatch_day: number | null;
+  stop_sequence: number | null;
   status: string;
   dispatched_at: string | null;
   arrived_at: string | null;
@@ -422,4 +485,71 @@ export type ArrivalEvent = {
 export type ArrivalEventsResponse = {
   events: ArrivalEvent[];
   count: number;
+};
+
+export type ManifestUploadResponse = {
+  success: boolean;
+  message: string;
+  manifest_id: number;
+  line_count: number;
+};
+
+export type ManifestArrivalResponse = {
+  success: boolean;
+  message: string;
+  arrived: number;
+  manifest_id: number;
+  total_skus_updated: number;
+  total_quantity_added: number;
+};
+
+export type DcSaleResponse = {
+  success: boolean;
+  message: string;
+  dc_id: number;
+  sku_id: number;
+  quantity_sold: number;
+};
+
+export type LorryAvailabilityResponse = {
+  success: boolean;
+  message: string;
+  lorry_id: number;
+  status: string;
+  business_dates: string[];
+};
+
+export type OpenExecutionStop = {
+  plan_stop_id: number;
+  plan_version_id: number;
+  plan_run_id: number;
+  dispatch_day: number;
+  lorry_id: number;
+  registration: string;
+  lorry_type: string;
+  dc_id: number;
+  dc_code: string;
+  dc_name: string;
+  stop_sequence: number;
+  items: Array<{
+    transfer_id: number;
+    sku_id: number;
+    sku_code: string;
+    sku_name: string;
+    quantity: number;
+  }>;
+};
+
+export type OpenExecutionStopsResponse = {
+  open_stops: OpenExecutionStop[];
+  count: number;
+};
+
+export type StopArrivalResponse = {
+  success: boolean;
+  message: string;
+  plan_stop_id: number;
+  transfers_arrived: number;
+  reservations_released: number;
+  total_quantity_moved: number;
 };

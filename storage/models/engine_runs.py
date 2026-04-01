@@ -126,12 +126,44 @@ class M3PlanVersion(Base, IdMixin, TimestampMixin):
     )
     approved_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    stops = relationship("M3PlanStop", back_populates="plan_version", cascade="all, delete-orphan")
+    runs = relationship("M3PlanRun", back_populates="plan_version", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_m3_plan_run", "engine_run_id"),
         Index("ix_m3_plan_status", "plan_status"),
         Index("ix_m3_plan_is_best", "is_best"),
+    )
+
+    @property
+    def stops(self):
+        flattened = []
+        for run in sorted(self.runs, key=lambda current: (current.dispatch_day, current.id or 0)):
+            flattened.extend(sorted(run.stops, key=lambda current: (current.stop_sequence, current.id or 0)))
+        return flattened
+
+
+class M3PlanRun(Base, IdMixin, TimestampMixin):
+    """One lorry trip assigned to a specific dispatch day within a plan version."""
+
+    __tablename__ = "m3_plan_runs"
+
+    plan_version_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("m3_plan_versions.id"), nullable=False
+    )
+    lorry_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("lorries.id"), nullable=False
+    )
+    dispatch_day: Mapped[int] = mapped_column(
+        Integer, nullable=False, comment="1 or 2 within the 48-hour planning horizon"
+    )
+
+    plan_version = relationship("M3PlanVersion", back_populates="runs")
+    stops = relationship("M3PlanStop", back_populates="run", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_m3_run_plan", "plan_version_id"),
+        Index("ix_m3_run_lorry", "lorry_id"),
+        Index("ix_m3_run_day", "dispatch_day"),
     )
 
 
@@ -140,11 +172,8 @@ class M3PlanStop(Base, IdMixin, TimestampMixin):
 
     __tablename__ = "m3_plan_stops"
 
-    plan_version_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("m3_plan_versions.id"), nullable=False
-    )
-    lorry_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("lorries.id"), nullable=False
+    plan_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("m3_plan_runs.id"), nullable=False
     )
     stop_sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     dc_id: Mapped[int] = mapped_column(
@@ -154,14 +183,21 @@ class M3PlanStop(Base, IdMixin, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
 
-    plan_version = relationship("M3PlanVersion", back_populates="stops")
+    run = relationship("M3PlanRun", back_populates="stops")
     items = relationship("M3PlanItem", back_populates="stop", cascade="all, delete-orphan")
 
     __table_args__ = (
-        Index("ix_m3_stop_plan", "plan_version_id"),
-        Index("ix_m3_stop_lorry", "lorry_id"),
+        Index("ix_m3_stop_run", "plan_run_id"),
         Index("ix_m3_stop_dc", "dc_id"),
     )
+
+    @property
+    def lorry_id(self):
+        return self.run.lorry_id if self.run else None
+
+    @property
+    def dispatch_day(self):
+        return self.run.dispatch_day if self.run else None
 
 
 class M3PlanItem(Base, IdMixin, TimestampMixin):
