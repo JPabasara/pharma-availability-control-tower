@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: pharma-control-tower-api
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: alembic upgrade head
+    startCommand: python -m uvicorn apps.api.app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/api/**
+        - db/**
+        - demo_state/**
+        - integrations/**
+        - scripts/**
+        - storage/**
+        - alembic.ini
+        - render.yaml
+        - requirements.txt
+        - verify_routes.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pharma-control-tower-db
+          property: connectionString
+      - key: ENGINE_MODE
+        value: stub
+      - key: BUSINESS_TIMEZONE
+        value: Asia/Colombo
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ALLOW_ORIGIN_REGEX
+        sync: false
+
+databases:
+  - name: pharma-control-tower-db
+    plan: free
+    region: singapore
