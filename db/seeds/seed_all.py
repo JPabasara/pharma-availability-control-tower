@@ -51,13 +51,17 @@ def read_csv(filename: str) -> list[dict]:
 
 def clear_all_tables(session):
     """Delete all data from all business tables (preserves schema)."""
-    # Disable FK checks for clean truncation
-    session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+    bind = session.get_bind()
+    
+    if bind.dialect.name == "postgresql":
+        for table in reversed(Base.metadata.sorted_tables):
+            session.execute(text(f"TRUNCATE TABLE {table.name} CASCADE"))
+    else:
+        session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+        for table in reversed(Base.metadata.sorted_tables):
+            session.execute(table.delete())
+        session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 
-    for table in reversed(Base.metadata.sorted_tables):
-        session.execute(table.delete())
-
-    session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
     session.commit()
     print("  Cleared all tables.")
 

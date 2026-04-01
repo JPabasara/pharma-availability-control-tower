@@ -21,21 +21,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def _drop_foreign_keys_for_columns(table_name: str, columns: list[str]) -> None:
     bind = op.get_bind()
-    rows = bind.execute(
-        sa.text(
-            """
-            SELECT constraint_name
-            FROM information_schema.key_column_usage
-            WHERE table_schema = DATABASE()
-              AND table_name = :table_name
-              AND referenced_table_name IS NOT NULL
-              AND column_name IN :columns
-            """
-        ).bindparams(sa.bindparam("columns", expanding=True)),
-        {"table_name": table_name, "columns": columns},
-    ).fetchall()
-    for row in rows:
-        op.drop_constraint(row[0], table_name, type_="foreignkey")
+    inspector = sa.inspect(bind)
+    fks = inspector.get_foreign_keys(table_name)
+    for fk in fks:
+        if any(col in columns for col in fk['constrained_columns']):
+            op.drop_constraint(fk['name'], table_name, type_="foreignkey")
 
 
 def upgrade() -> None:
@@ -71,19 +61,31 @@ def upgrade() -> None:
     op.execute(
         """
         INSERT INTO m3_plan_runs (plan_version_id, lorry_id, dispatch_day, created_at, updated_at)
-        SELECT DISTINCT plan_version_id, lorry_id, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()
+        SELECT DISTINCT plan_version_id, lorry_id, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         FROM m3_plan_stops
         """
     )
-    op.execute(
-        """
-        UPDATE m3_plan_stops s
-        JOIN m3_plan_runs r
-          ON r.plan_version_id = s.plan_version_id
-         AND r.lorry_id = s.lorry_id
-        SET s.plan_run_id = r.id
-        """
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute(
+            """
+            UPDATE m3_plan_stops
+            SET plan_run_id = r.id
+            FROM m3_plan_runs r
+            WHERE r.plan_version_id = m3_plan_stops.plan_version_id
+              AND r.lorry_id = m3_plan_stops.lorry_id
+            """
+        )
+    else:
+        op.execute(
+            """
+            UPDATE m3_plan_stops s
+            JOIN m3_plan_runs r
+              ON r.plan_version_id = s.plan_version_id
+             AND r.lorry_id = s.lorry_id
+            SET s.plan_run_id = r.id
+            """
+        )
 
     _drop_foreign_keys_for_columns("m3_plan_stops", ["plan_version_id", "lorry_id"])
     with op.batch_alter_table("m3_plan_stops") as batch_op:
@@ -102,19 +104,34 @@ def upgrade() -> None:
     op.create_foreign_key(None, "demo_transfers", "m3_plan_stops", ["plan_stop_id"], ["id"])
     op.create_index("ix_demo_xfer_stop", "demo_transfers", ["plan_stop_id"], unique=False)
 
-    op.execute(
-        """
-        UPDATE demo_transfers t
-        JOIN m3_plan_runs r
-          ON r.plan_version_id = t.plan_version_id
-         AND r.lorry_id = t.lorry_id
-        JOIN m3_plan_stops s
-          ON s.plan_run_id = r.id
-         AND s.dc_id = t.dc_id
-        SET t.plan_stop_id = s.id
-        WHERE t.plan_stop_id IS NULL
-        """
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute(
+            """
+            UPDATE demo_transfers
+            SET plan_stop_id = s.id
+            FROM m3_plan_runs r
+            JOIN m3_plan_stops s ON s.plan_run_id = r.id
+            WHERE r.plan_version_id = demo_transfers.plan_version_id
+              AND r.lorry_id = demo_transfers.lorry_id
+              AND s.dc_id = demo_transfers.dc_id
+              AND demo_transfers.plan_stop_id IS NULL
+            """
+        )
+    else:
+        op.execute(
+            """
+            UPDATE demo_transfers t
+            JOIN m3_plan_runs r
+              ON r.plan_version_id = t.plan_version_id
+             AND r.lorry_id = t.lorry_id
+            JOIN m3_plan_stops s
+              ON s.plan_run_id = r.id
+             AND s.dc_id = t.dc_id
+            SET t.plan_stop_id = s.id
+            WHERE t.plan_stop_id IS NULL
+            """
+        )
 
     op.create_table(
         "demo_lorry_day_states",
@@ -153,14 +170,26 @@ def downgrade() -> None:
         batch_op.add_column(sa.Column("plan_version_id", sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column("lorry_id", sa.Integer(), nullable=True))
 
-    op.execute(
-        """
-        UPDATE m3_plan_stops s
-        JOIN m3_plan_runs r ON r.id = s.plan_run_id
-        SET s.plan_version_id = r.plan_version_id,
-            s.lorry_id = r.lorry_id
-        """
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute(
+            """
+            UPDATE m3_plan_stops
+            SET plan_version_id = r.plan_version_id,
+                lorry_id = r.lorry_id
+            FROM m3_plan_runs r
+            WHERE r.id = m3_plan_stops.plan_run_id
+            """
+        )
+    else:
+        op.execute(
+            """
+            UPDATE m3_plan_stops s
+            JOIN m3_plan_runs r ON r.id = s.plan_run_id
+            SET s.plan_version_id = r.plan_version_id,
+                s.lorry_id = r.lorry_id
+            """
+        )
 
     _drop_foreign_keys_for_columns("m3_plan_stops", ["plan_run_id"])
     with op.batch_alter_table("m3_plan_stops") as batch_op:
