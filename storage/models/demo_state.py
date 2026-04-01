@@ -1,9 +1,10 @@
 """Demo-state storage: reservations, transfers, arrival events, stock projections."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import (
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -24,6 +25,9 @@ class DemoReservation(Base, IdMixin, TimestampMixin):
     plan_version_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("m3_plan_versions.id"), nullable=False
     )
+    plan_stop_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("m3_plan_stops.id"), nullable=True
+    )
     sku_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("skus.id"), nullable=False
     )
@@ -35,6 +39,7 @@ class DemoReservation(Base, IdMixin, TimestampMixin):
 
     __table_args__ = (
         Index("ix_demo_res_plan", "plan_version_id"),
+        Index("ix_demo_res_stop", "plan_stop_id"),
         Index("ix_demo_res_sku", "sku_id"),
         Index("ix_demo_res_status", "status"),
     )
@@ -47,6 +52,9 @@ class DemoTransfer(Base, IdMixin, TimestampMixin):
 
     plan_version_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("m3_plan_versions.id"), nullable=False
+    )
+    plan_stop_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("m3_plan_stops.id"), nullable=True
     )
     lorry_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("lorries.id"), nullable=False
@@ -71,6 +79,7 @@ class DemoTransfer(Base, IdMixin, TimestampMixin):
 
     __table_args__ = (
         Index("ix_demo_xfer_plan", "plan_version_id"),
+        Index("ix_demo_xfer_stop", "plan_stop_id"),
         Index("ix_demo_xfer_lorry", "lorry_id"),
         Index("ix_demo_xfer_dc", "dc_id"),
         Index("ix_demo_xfer_sku", "sku_id"),
@@ -85,7 +94,7 @@ class DemoArrivalEvent(Base, IdMixin, TimestampMixin):
 
     event_type: Mapped[str] = mapped_column(
         String(30), nullable=False,
-        comment="vessel_arrival or lorry_arrival"
+        comment="vessel_arrival, lorry_arrival, manifest_upload, or dc_sale"
     )
     reference_id: Mapped[int] = mapped_column(
         Integer, nullable=False,
@@ -126,4 +135,29 @@ class DemoStockProjection(Base, IdMixin, TimestampMixin):
         Index("ix_demo_proj_location", "location_type", "location_id"),
         Index("ix_demo_proj_sku", "sku_id"),
         Index("ix_demo_proj_time", "projection_time"),
+    )
+
+
+class DemoLorryDayState(Base, IdMixin, TimestampMixin):
+    """Effective lorry state for a specific business day in the 48-hour horizon."""
+
+    __tablename__ = "demo_lorry_day_states"
+
+    lorry_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("lorries.id"), nullable=False
+    )
+    business_date: Mapped[date] = mapped_column(
+        Date, nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, comment="available, unavailable, or assigned"
+    )
+    source: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="manual", comment="manual or plan_approval"
+    )
+
+    __table_args__ = (
+        Index("ix_demo_lorry_day_lorry", "lorry_id"),
+        Index("ix_demo_lorry_day_date", "business_date"),
+        Index("ix_demo_lorry_day_status", "status"),
     )

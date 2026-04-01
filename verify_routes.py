@@ -1,8 +1,8 @@
 """Verify all FastAPI routes import and register correctly."""
+
 import sys
 from pathlib import Path
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from apps.api.app.main import app
@@ -19,8 +19,7 @@ for route in app.routes:
             if method != "HEAD":
                 routes.append((method, route.path))
 
-# Sort by path for readability
-routes.sort(key=lambda x: (x[1], x[0]))
+routes.sort(key=lambda value: (value[1], value[0]))
 
 for method, path in routes:
     print(f"  {method:6s} {path}")
@@ -29,7 +28,6 @@ print()
 print(f"Total endpoints: {len(routes)}")
 print()
 
-# Verify expected endpoints exist
 expected = [
     ("GET", "/"),
     ("GET", "/api/v1/inputs/manifests"),
@@ -50,6 +48,13 @@ expected = [
     ("POST", "/api/v1/planner/approve/{plan_version_id}"),
     ("POST", "/api/v1/planner/reject/{plan_version_id}"),
     ("POST", "/api/v1/planner/override/{plan_version_id}"),
+    ("POST", "/api/v1/demo-operations/manifests/upload"),
+    ("POST", "/api/v1/demo-operations/manifests/{manifest_id}/arrive"),
+    ("POST", "/api/v1/demo-operations/dc-sales"),
+    ("GET", "/api/v1/demo-operations/lorries/horizon"),
+    ("POST", "/api/v1/demo-operations/lorries/{lorry_id}/availability"),
+    ("GET", "/api/v1/demo-operations/execution/open-stops"),
+    ("POST", "/api/v1/demo-operations/execution/stops/{plan_stop_id}/arrive"),
     ("GET", "/api/v1/demo-state/reservations"),
     ("GET", "/api/v1/demo-state/transfers"),
     ("GET", "/api/v1/demo-state/stock-summary"),
@@ -61,18 +66,15 @@ expected = [
     ("GET", "/api/v1/dashboard/summary"),
 ]
 
-missing = []
-for method, path in expected:
-    if (method, path) not in routes:
-        missing.append((method, path))
+missing = [(method, path) for method, path in expected if (method, path) not in routes]
 
 if missing:
     print("MISSING ENDPOINTS:")
-    for m, p in missing:
-        print(f"  ✗ {m} {p}")
+    for method, path in missing:
+        print(f"  X {method} {path}")
     print()
     sys.exit(1)
-else:
-    print(f"✓ All {len(expected)} expected endpoints are registered.")
-    print()
-    print("VERIFICATION PASSED")
+
+print(f"OK: All {len(expected)} expected endpoints are registered.")
+print()
+print("VERIFICATION PASSED")

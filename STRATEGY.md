@@ -2,116 +2,116 @@
 
 ## Strategic Intent
 
-Build a credible planner-facing decision layer in 7 days without turning the repo into an ERP clone.
+Build a planner-facing control tower that stays modular, explainable, and operationally credible without turning the product into a full ERP.
 
-The core idea is simple:
-
-- snapshots come in from readers
-- `M1`, `M2`, and `M3` reason over those snapshots
-- the planner reviews and decides
-- a separate demo-only module simulates stock movement for the demo
+The current strategy is to keep planning, execution state, and physical stock progression separated while still making the hosted demo feel like a usable end-to-end system.
 
 ## Strategy 1 - Keep Boundaries Hard
 
-The most important decision is architectural separation.
+The architecture depends on four clear layers:
 
-### Engines
-- consume snapshots
-- produce scores, requests, plans, and reports
-- never mutate stock
+- **inputs/readers**
+- **pure decision engines**
+- **planner decisions**
+- **demo operations / execution events**
 
-### Demo state
-- reacts only after approval
-- creates reservation state
-- simulates arrival and stock movement for the demo
+This is the most important strategic choice in the system. It keeps engine logic reusable, planner actions auditable, and demo-state progression understandable.
 
-### Why this matters
-- engine logic stays reusable
-- transaction behavior does not leak into model code
-- the demo can still show end-to-end state progression
+## Strategy 2 - Treat Effective State As A Platform Concern
 
-## Strategy 2 - Treat Inputs as "Effective" Snapshots
+The engines should never compute against raw physical stock alone.
 
-Use stable readers for operational inputs, executed *only on-demand* via user UI triggers:
+The platform layer owns:
 
-- `manifest_reader`
-- `warehouse_stock_reader` (Calculates Effective = Physical - Reserved)
-- `dc_stock_reader` (Calculates Effective = Physical + In-Transit)
-- `sales_history_reader` (Projects 48-hour forecast)
-- `lorry_state_reader` (Binary: Available or Unavailable)
+- warehouse effective stock
+- DC effective stock
+- lorry horizon state for Day 1 and Day 2
 
-This keeps ingest simple and solves the "Ghost Inventory" double-allocation problem.
+That means:
 
-## Strategy 3 - Keep M3 Explainable
+- approved reservations affect warehouse availability
+- approved transfers affect DC effective availability
+- lorry-day assignments affect future lorry feasibility
 
-`M3` must stay split internally:
+The engines remain clean because these rules live in readers and orchestration, not inside model code.
 
-- optimizer generates feasible plans
-- ranker scores likely planner acceptance
+## Strategy 3 - Keep Approval And Physical Movement Separate
 
-This keeps plan generation explainable and easier to debug.
+Planner approval is a planning event, not a physical stock movement event.
 
-## Strategy 4 - Narrow the MVP
+Approval creates:
 
-The MVP stays intentionally narrow to keep the math solvable:
+- reservations
+- in-transit transfers
+- lorry day assignments
 
-- 5 DCs
-- 8 lorries total (Binary lorry availability: Available / Unavailable)
-- 48-hour planning horizon
-- 1 guaranteed trip per lorry per plan (no complex multi-shift reuse)
-- maximum 2 stops per lorry route
-- planner-only UI triggered on-demand
+Physical stock changes only when business events are posted:
 
-Smaller scope makes the dispatch output easier to trust and demo.
+- manifest arrival
+- DC sale
+- stop arrival at a DC
 
-## Strategy 5 - Lock User Behavior
+This preserves auditability and keeps the business story coherent.
 
-The planner can:
+## Strategy 4 - Use Hosted Demo Operations, Not Raw DB Editing
 
-- review input snapshots
-- request model execution ("Generate Plan")
-- review M1, M2, and M3 outputs
-- override lorry choice, stop order, and quantities
-- **NEW**: Any override is subject to a strict Math-Bound Validation Engine (checking capacities, effective stock limits, and reefer rules) before it can be frozen.
-- approve or reject a plan
+The system now exposes backend commands through the frontend instead of relying on raw database edits or CLI-only progression.
 
-Once approved, that plan version is immutable.
+That means the hosted demo can move forward through controlled operations:
 
-## Strategy 6 - Keep Shared Semantics Simple
+- upload manifest
+- mark manifest arrived
+- post DC sale
+- toggle lorry availability for the next 2 planning days
+- mark stop arrival
 
-- use `quantity` for manifest, stock, requests, and plan items
-- use `capacity_unit` for lorry capacity and feasibility
-- show M1 line-level output and aggregated SKU summary
-- keep later runs dependent on new snapshots, not hidden state inside engines
+This is strategically better than allowing planners to edit stock tables directly because it keeps state transitions intentional and traceable.
 
-## Strategy 7 - Preserve Demo Credibility via Scripts
+## Strategy 5 - Keep M3 Run-Based And Explainable
 
-The demo must visibly show state progression without models polling databases.
+M3 should be thought of as a 2-day lorry schedule, not just a flat list of stops.
 
-We handle physical movement via backend CLI scripts (e.g., `simulate_vessel_arrival.py`) that naturally update the underlying physical stock tables. When the planner next generates a plan, the M2/M3 algorithms organically react to these script-injected physical realities.
+Current planning language should therefore stay:
 
-## Strategy 8 - Use Contract Stubs To Unblock Platform
+- `runs -> stops -> items`
+- each run has `lorry_id`
+- each run has `dispatch_day`
+- each run can contain at most 2 DC stops
 
-Outside-engine work should be able to move before the real engines are integrated.
+This makes the dispatch output easier to reason about and aligns planner override behavior with actual lorry-day constraints.
 
-- return contract-compatible stub outputs for `M1`, `M2`, and `M3` where needed
-- keep API shapes stable so real engines can replace stubs without rewriting frontend or planner flow
-- treat stubs as temporary platform scaffolding, not engine logic
+## Strategy 6 - Keep Stubs As A Bridge, Not A Fork
 
-## Technical Posture
+The platform should continue to treat stub engines as temporary infrastructure, not as a separate product mode.
 
-- FastAPI orchestrates readers, engines, planner flow, and reporting
-- Next.js provides the planner console
-- MySQL 8 stores snapshots, decisions, audit, and demo-state data
-- Docker-based local MySQL is the default MVP setup
-- XGBoost supports M1 and the M3 ranker
-- OR-Tools supports dispatch optimization
+The important rule is:
+
+- frontend contracts stay stable
+- planner APIs stay stable
+- real engines replace the stub bridge behind the same interfaces
+
+That is what allows current platform work, hosting, and CI/CD to move forward before real-engine integration is complete.
+
+## Strategy 7 - Stay Local-First, Then Host Cleanly
+
+The current system is local-first and demo-ready:
+
+- MySQL in Docker
+- FastAPI backend
+- Next.js frontend
+
+The next hosting strategy is intentionally simple:
+
+- frontend on Vercel
+- backend and MySQL on Railway
+- CI/CD through GitHub Actions and auto-deploy
+
+This keeps the product moving without redesigning the architecture for deployment.
 
 ## Final Position
 
-This MVP should feel modular, honest, and easy to explain:
+The current platform should be explained in one sentence like this:
 
-- inputs are snapshots
-- engines are pure
-- planner is in control
-- demo-state handles demo-only stock progression
+inputs feed pure decision engines, planners make controlled decisions, and demo operations advance physical business state through auditable backend events.
+
+That remains the core strategy for the next phase as real `M1`, `M2`, and `M3` are integrated and the system moves to hosted deployment.

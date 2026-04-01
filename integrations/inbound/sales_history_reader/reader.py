@@ -1,4 +1,4 @@
-"""Sales history reader — reads last 7 days and computes 48-hour demand forecast per DC per SKU."""
+"""Sales history reader — reads last 30 days and computes 48-hour demand forecast per DC per SKU."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 from storage.models import SalesHistoryRecord, DC, SKU
 
 
-def get_recent_sales(session: Session, days: int = 7) -> list[SalesHistoryRecord]:
+def get_recent_sales(session: Session, days: int = 30) -> list[SalesHistoryRecord]:
     """Fetch sales history records from the last N days."""
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     return (
         session.query(SalesHistoryRecord)
         .filter(SalesHistoryRecord.sale_date >= cutoff)
@@ -19,7 +19,7 @@ def get_recent_sales(session: Session, days: int = 7) -> list[SalesHistoryRecord
     )
 
 
-def compute_48h_forecasts(session: Session, days: int = 7) -> list[dict]:
+def compute_48h_forecasts(session: Session, days: int = 30) -> list[dict]:
     """Compute 48-hour demand forecast per DC per SKU.
 
     Algorithm: avg daily sales over last N days × 2 (for 48 hours)
@@ -33,13 +33,13 @@ def compute_48h_forecasts(session: Session, days: int = 7) -> list[dict]:
                 sku_id: int,
                 sku_code: str,
                 sku_name: str,
-                total_sold_7d: int,
+                total_sold_30d: int,
                 daily_avg: float,
                 forecast_48h: float
             }
         ]
     """
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Aggregate total sold per (dc_id, sku_id) over the period
     rows = (
@@ -70,7 +70,8 @@ def compute_48h_forecasts(session: Session, days: int = 7) -> list[dict]:
             "sku_id": row.sku_id,
             "sku_code": sku.code if sku else "UNKNOWN",
             "sku_name": sku.name if sku else "Unknown SKU",
-            "total_sold_7d": total_sold,
+            "total_sold_30d": total_sold,
+            "lookback_days": days,
             "daily_avg": round(daily_avg, 2),
             "forecast_48h": round(forecast_48h, 2),
         })

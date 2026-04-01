@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from apps.api.app.dependencies.database import get_db
 from storage.models import (
+    M3PlanRun,
     M3PlanVersion,
     M3PlanStop,
     M3PlanItem,
@@ -32,7 +33,9 @@ def get_approved_plans(db: Session = Depends(get_db)):
     plans = (
         db.query(M3PlanVersion)
         .options(
-            joinedload(M3PlanVersion.stops).joinedload(M3PlanStop.items)
+            joinedload(M3PlanVersion.runs)
+            .joinedload(M3PlanRun.stops)
+            .joinedload(M3PlanStop.items)
         )
         .filter(M3PlanVersion.plan_status == "approved")
         .order_by(M3PlanVersion.approved_at.desc())
@@ -78,31 +81,49 @@ def get_approved_plans(db: Session = Depends(get_db)):
 
             decision_list.append(decision_data)
 
-        # Build stops
+        # Build runs and flattened stops
+        runs = []
         stops = []
-        for stop in plan.stops:
-            lorry = db.query(Lorry).filter(Lorry.id == stop.lorry_id).first()
-            dc = db.query(DC).filter(DC.id == stop.dc_id).first()
+        for run in sorted(plan.runs, key=lambda current: (current.dispatch_day, current.id or 0)):
+            lorry = db.query(Lorry).filter(Lorry.id == run.lorry_id).first()
+            run_stops = []
+            for stop in sorted(run.stops, key=lambda current: (current.stop_sequence, current.id or 0)):
+                dc = db.query(DC).filter(DC.id == stop.dc_id).first()
 
-            items = []
-            for item in stop.items:
-                sku = db.query(SKU).filter(SKU.id == item.sku_id).first()
-                items.append({
-                    "sku_id": item.sku_id,
-                    "sku_code": sku.code if sku else "UNKNOWN",
-                    "sku_name": sku.name if sku else "Unknown",
-                    "quantity": item.quantity,
+                items = []
+                for item in stop.items:
+                    sku = db.query(SKU).filter(SKU.id == item.sku_id).first()
+                    items.append({
+                        "sku_id": item.sku_id,
+                        "sku_code": sku.code if sku else "UNKNOWN",
+                        "sku_name": sku.name if sku else "Unknown",
+                        "quantity": item.quantity,
+                    })
+
+                stop_payload = {
+                    "id": stop.id,
+                    "stop_sequence": stop.stop_sequence,
+                    "dc_id": stop.dc_id,
+                    "dc_code": dc.code if dc else "UNKNOWN",
+                    "dc_name": dc.name if dc else "Unknown",
+                    "items": items,
+                }
+                run_stops.append(stop_payload)
+                stops.append({
+                    **stop_payload,
+                    "dispatch_day": run.dispatch_day,
+                    "lorry_id": run.lorry_id,
+                    "registration": lorry.registration if lorry else "UNKNOWN",
+                    "lorry_type": lorry.lorry_type if lorry else "unknown",
                 })
 
-            stops.append({
-                "lorry_id": stop.lorry_id,
+            runs.append({
+                "id": run.id,
+                "lorry_id": run.lorry_id,
                 "registration": lorry.registration if lorry else "UNKNOWN",
                 "lorry_type": lorry.lorry_type if lorry else "unknown",
-                "stop_sequence": stop.stop_sequence,
-                "dc_id": stop.dc_id,
-                "dc_code": dc.code if dc else "UNKNOWN",
-                "dc_name": dc.name if dc else "Unknown",
-                "items": items,
+                "dispatch_day": run.dispatch_day,
+                "stops": run_stops,
             })
 
         result.append({
@@ -112,6 +133,7 @@ def get_approved_plans(db: Session = Depends(get_db)):
             "score": plan.score,
             "approved_at": plan.approved_at.isoformat() if plan.approved_at else None,
             "approved_by": plan.approved_by,
+            "runs": runs,
             "stops": stops,
             "decisions": decision_list,
         })

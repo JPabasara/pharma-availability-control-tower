@@ -36,7 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/requests", label: "M2 Requests", useRunContext: true, icon: ClipboardList },
   { href: "/dispatch", label: "M3 Dispatch", useRunContext: true, icon: Truck },
   { href: "/history", label: "History", icon: Clock },
-  { href: "/demo-state", label: "Demo State", icon: Activity },
+  { href: "/demo-state", label: "Demo Operations", icon: Activity },
   { href: "/reports", label: "Reports", icon: FileText },
 ];
 

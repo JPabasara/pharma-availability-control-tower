@@ -22,6 +22,7 @@ from storage.models import (
     EngineRun,
     M1Result,
     M2Request,
+    M3PlanRun,
     M3PlanVersion,
     M3PlanStop,
     M3PlanItem,
@@ -46,15 +47,19 @@ class OverrideItemSchema(BaseModel):
 
 
 class OverrideStopSchema(BaseModel):
-    lorry_id: int | None = None
-    dc_id: int | None = None
-    stop_index: int | None = None
+    dc_id: int
     stop_sequence: int | None = None
-    items: list[OverrideItemSchema] | None = None
+    items: list[OverrideItemSchema] = []
+
+
+class OverrideRunSchema(BaseModel):
+    lorry_id: int
+    dispatch_day: int
+    stops: list[OverrideStopSchema]
 
 
 class OverrideRequest(BaseModel):
-    changes: list[OverrideStopSchema]
+    changes: list[OverrideRunSchema]
     notes: str = ""
     override_by: str = "planner"
 
@@ -199,6 +204,8 @@ def get_m3_plans(run_id: int, db: Session = Depends(get_db)):
             "is_best": p.is_best,
             "approved_at": p.approved_at.isoformat() if p.approved_at else None,
             "approved_by": p.approved_by,
+            "run_count": len(p.runs),
+            "stop_count": len(p.stops),
         })
 
     return {
@@ -215,7 +222,9 @@ def get_m3_plan_detail(run_id: int, version_id: int, db: Session = Depends(get_d
     plan = (
         db.query(M3PlanVersion)
         .options(
-            joinedload(M3PlanVersion.stops).joinedload(M3PlanStop.items)
+            joinedload(M3PlanVersion.runs)
+            .joinedload(M3PlanRun.stops)
+            .joinedload(M3PlanStop.items)
         )
         .filter(M3PlanVersion.id == version_id, M3PlanVersion.engine_run_id == run_id)
         .first()
@@ -226,35 +235,54 @@ def get_m3_plan_detail(run_id: int, version_id: int, db: Session = Depends(get_d
             detail=f"Plan version {version_id} for run {run_id} not found.",
         )
 
+    runs = []
     stops = []
     total_items = 0
-    for stop in plan.stops:
-        lorry = db.query(Lorry).filter(Lorry.id == stop.lorry_id).first()
-        dc = db.query(DC).filter(DC.id == stop.dc_id).first()
+    for run in sorted(plan.runs, key=lambda current: (current.dispatch_day, current.id or 0)):
+        lorry = db.query(Lorry).filter(Lorry.id == run.lorry_id).first()
+        run_stops = []
 
-        items = []
-        for item in stop.items:
-            sku = db.query(SKU).filter(SKU.id == item.sku_id).first()
-            items.append({
-                "id": item.id,
-                "sku_id": item.sku_id,
-                "sku_code": sku.code if sku else "UNKNOWN",
-                "sku_name": sku.name if sku else "Unknown",
-                "quantity": item.quantity,
+        for stop in sorted(run.stops, key=lambda current: (current.stop_sequence, current.id or 0)):
+            dc = db.query(DC).filter(DC.id == stop.dc_id).first()
+            items = []
+            for item in stop.items:
+                sku = db.query(SKU).filter(SKU.id == item.sku_id).first()
+                items.append({
+                    "id": item.id,
+                    "sku_id": item.sku_id,
+                    "sku_code": sku.code if sku else "UNKNOWN",
+                    "sku_name": sku.name if sku else "Unknown",
+                    "quantity": item.quantity,
+                })
+                total_items += 1
+
+            stop_payload = {
+                "id": stop.id,
+                "stop_sequence": stop.stop_sequence,
+                "dc_id": stop.dc_id,
+                "dc_code": dc.code if dc else "UNKNOWN",
+                "dc_name": dc.name if dc else "Unknown",
+                "items": items,
+            }
+            run_stops.append(stop_payload)
+            stops.append({
+                **stop_payload,
+                "lorry_id": run.lorry_id,
+                "registration": lorry.registration if lorry else "UNKNOWN",
+                "lorry_type": lorry.lorry_type if lorry else "unknown",
+                "capacity_units": lorry.capacity_units if lorry else 0,
+                "dispatch_day": run.dispatch_day,
             })
-            total_items += 1
 
-        stops.append({
-            "id": stop.id,
-            "lorry_id": stop.lorry_id,
+        runs.append({
+            "id": run.id,
+            "lorry_id": run.lorry_id,
             "registration": lorry.registration if lorry else "UNKNOWN",
             "lorry_type": lorry.lorry_type if lorry else "unknown",
             "capacity_units": lorry.capacity_units if lorry else 0,
-            "stop_sequence": stop.stop_sequence,
-            "dc_id": stop.dc_id,
-            "dc_code": dc.code if dc else "UNKNOWN",
-            "dc_name": dc.name if dc else "Unknown",
-            "items": items,
+            "dispatch_day": run.dispatch_day,
+            "stops": run_stops,
+            "total_stops": len(run_stops),
         })
 
     return {
@@ -266,7 +294,9 @@ def get_m3_plan_detail(run_id: int, version_id: int, db: Session = Depends(get_d
         "is_best": plan.is_best,
         "approved_at": plan.approved_at.isoformat() if plan.approved_at else None,
         "approved_by": plan.approved_by,
+        "runs": runs,
         "stops": stops,
+        "total_runs": len(runs),
         "total_stops": len(stops),
         "total_items": total_items,
     }

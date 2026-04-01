@@ -169,9 +169,14 @@ export default function InputsPage() {
                     <div className="manifest-card-header">
                       <div>
                         <h4>
-                          {manifest.vessel_name} <span className="subtle-text">({manifest.vessel_code})</span>
+                          {manifest.manifest_name}
                         </h4>
-                        <p>Snapshot at {formatDateTime(manifest.snapshot_time)}</p>
+                        <p>
+                          {manifest.vessel_name} <span className="subtle-text">({manifest.vessel_code})</span>
+                        </p>
+                        <p>
+                          Snapshot at {formatDateTime(manifest.snapshot_time)}
+                        </p>
                       </div>
                       <StatusPill value={manifest.status} />
                     </div>
@@ -259,13 +264,13 @@ export default function InputsPage() {
           {activeTab === "sales" ? (
             <SectionCard
               title="Sales History Forecasts"
-              description="48-hour demand forecasts derived from the last seven days of seeded sales data."
+              description="48-hour demand forecasts derived from the trailing 30 days of sales history."
             >
               <DataTable
                 columns={[
                   { key: "dc", header: "DC", render: (row) => row.dc_code },
                   { key: "sku", header: "SKU", render: (row) => row.sku_code },
-                  { key: "sold", header: "Sold 7d", render: (row) => formatInteger(row.total_sold_7d) },
+                  { key: "sold", header: "Sold 30d", render: (row) => formatInteger(row.total_sold_30d) },
                   { key: "daily", header: "Daily Avg", render: (row) => formatNumber(row.daily_avg) },
                   { key: "forecast", header: "Forecast 48h", render: (row) => formatNumber(row.forecast_48h) },
                 ]}
@@ -278,14 +283,16 @@ export default function InputsPage() {
           {activeTab === "lorries" ? (
             <SectionCard
               title="Lorry Availability"
-              description="Binary availability snapshot used by M3 when generating candidate plans."
+              description="Current base snapshot plus the effective Day 1 and Day 2 horizon used by M3."
             >
               <DataTable
                 columns={[
                   { key: "reg", header: "Registration", render: (row) => row.registration },
                   { key: "type", header: "Type", render: (row) => <StatusPill value={row.lorry_type} tone="info" /> },
                   { key: "capacity", header: "Capacity", render: (row) => formatInteger(row.capacity_units) },
-                  { key: "status", header: "Status", render: (row) => <StatusPill value={row.status} /> },
+                  { key: "status", header: "Base", render: (row) => <StatusPill value={row.status} /> },
+                  { key: "day1", header: "Day 1", render: (row) => <StatusPill value={row.day1_status} /> },
+                  { key: "day2", header: "Day 2", render: (row) => <StatusPill value={row.day2_status} /> },
                 ]}
                 rows={lorries.lorries}
                 getRowKey={(row) => row.lorry_id}
