@@ -79,14 +79,35 @@ def get_all_active_etas(session: Session) -> list[dict]:
 def refresh_eta(session: Session, vessel_id: int, *, auto_commit: bool = True) -> dict:
     """Generate a new mock ETA for a vessel and persist it.
 
-    Mock logic: current time + random offset between 4-48 hours.
-    Each refresh simulates an updated ETA from a real tracking API.
-
-    Returns the newly created ETA as a dict.
+    Mock logic:
+    - If a previous ETA exists, there's an 80% chance of a minor drift (-3 to +3 hours)
+      and a 20% chance of a major delay (+6 to +18 hours).
+    - If no previous ETA exists, generates a fresh random offset (12-48 hours).
     """
     now = datetime.now(timezone.utc)
-    offset_hours = random.uniform(4, 48)
-    new_eta_time = now + timedelta(hours=offset_hours)
+    latest = get_latest_eta(session, vessel_id)
+
+    if latest:
+        if random.random() < 0.80:
+            offset_hours = random.uniform(-3.0, 3.0)
+        else:
+            offset_hours = random.uniform(6.0, 18.0)
+            
+        old_eta = latest.eta_time
+        if old_eta.tzinfo is None:
+            old_eta = old_eta.replace(tzinfo=timezone.utc)
+            
+        new_eta_time = old_eta + timedelta(hours=offset_hours)
+        
+        # Prevent ETA from shifting into the past if the vessel hasn't arrived
+        if new_eta_time < now:
+            new_eta_time = now + timedelta(hours=random.uniform(1.0, 4.0))
+            
+        hours_until_arrival = (new_eta_time - now).total_seconds() / 3600.0
+    else:
+        offset_hours = random.uniform(12.0, 48.0)
+        new_eta_time = now + timedelta(hours=offset_hours)
+        hours_until_arrival = offset_hours
 
     eta_snapshot = ETASnapshot(
         vessel_id=vessel_id,
@@ -108,7 +129,7 @@ def refresh_eta(session: Session, vessel_id: int, *, auto_commit: bool = True) -
         "vessel_code": vessel.code if vessel else "UNKNOWN",
         "eta_time": new_eta_time.isoformat(),
         "fetched_at": now.isoformat(),
-        "hours_until_arrival": round(offset_hours, 1),
+        "hours_until_arrival": round(hours_until_arrival, 1),
         "source": "mock_api",
     }
 

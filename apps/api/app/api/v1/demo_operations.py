@@ -26,7 +26,9 @@ class LorryAvailabilityRequest(BaseModel):
 @router.post("/manifests/upload")
 async def upload_manifest(
     manifest_name: str = Form(...),
-    vessel_id: int = Form(...),
+    vessel_id: int | None = Form(None),
+    new_vessel_name: str | None = Form(None),
+    new_vessel_code: str | None = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
@@ -34,6 +36,8 @@ async def upload_manifest(
         db,
         manifest_name=manifest_name,
         vessel_id=vessel_id,
+        new_vessel_name=new_vessel_name,
+        new_vessel_code=new_vessel_code,
         csv_bytes=await file.read(),
     )
     if not result["success"]:

@@ -129,6 +129,9 @@ export default function DemoStatePage() {
 
   const [manifestName, setManifestName] = useState("");
   const [selectedVesselId, setSelectedVesselId] = useState<number | null>(null);
+  const [isNewVessel, setIsNewVessel] = useState(false);
+  const [newVesselName, setNewVesselName] = useState("");
+  const [newVesselCode, setNewVesselCode] = useState("");
   const [manifestFile, setManifestFile] = useState<File | null>(null);
   const [manifestFileKey, setManifestFileKey] = useState(0);
   const [selectedDcId, setSelectedDcId] = useState<number | null>(null);
@@ -222,25 +225,42 @@ export default function DemoStatePage() {
   }, [saleQuantity, selectedSku]);
 
   async function handleManifestUpload() {
-    if (!manifestName.trim() || !selectedVesselId || !manifestFile) {
+    if (!manifestName.trim() || !manifestFile) {
       setNotice({
         tone: "error",
         title: "Manifest upload is incomplete",
-        message: "Add a manifest name, choose a vessel, and attach a CSV before uploading.",
+        message: "Add a manifest name and attach a CSV before uploading.",
       });
       return;
     }
+    if (isNewVessel) {
+      if (!newVesselName.trim() || !newVesselCode.trim()) {
+        setNotice({ tone: "error", title: "Manifest upload is incomplete", message: "You must provide both a new vessel name and code." });
+        return;
+      }
+    } else if (!selectedVesselId) {
+      setNotice({ tone: "error", title: "Manifest upload is incomplete", message: "Please select a vessel." });
+      return;
+    }
+    
     setActionLoading(true);
     setNotice(null);
     try {
       const formData = new FormData();
       formData.set("manifest_name", manifestName.trim());
-      formData.set("vessel_id", String(selectedVesselId));
+      if (isNewVessel) {
+        formData.set("new_vessel_name", newVesselName.trim());
+        formData.set("new_vessel_code", newVesselCode.trim());
+      } else {
+        formData.set("vessel_id", String(selectedVesselId));
+      }
       formData.set("file", manifestFile);
       const response = await uploadManifest(formData);
       setNotice({ tone: "success", title: "Manifest uploaded", message: response.message });
       setManifestName("");
       setManifestFile(null);
+      setNewVesselName("");
+      setNewVesselCode("");
       setManifestFileKey((current) => current + 1);
       setReloadKey((current) => current + 1);
     } catch (cause) {
@@ -462,14 +482,27 @@ export default function DemoStatePage() {
                   <input id="manifest-name" value={manifestName} onChange={(event) => setManifestName(event.target.value)} placeholder="Inbound Manifest Gamma" />
                 </div>
                 <div className="form-field">
-                  <label htmlFor="manifest-vessel">Vessel</label>
-                  <select id="manifest-vessel" value={selectedVesselId ?? ""} onChange={(event) => setSelectedVesselId(Number(event.target.value))}>
-                    {(etas?.etas ?? []).map((eta) => (
-                      <option key={eta.vessel_id} value={eta.vessel_id}>
-                        {eta.vessel_name} ({eta.vessel_code}) | ETA {formatDateTime(eta.eta_time)}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label htmlFor="manifest-vessel">Vessel</label>
+                    <label style={{ fontWeight: "normal", fontSize: "0.85rem", display: "flex", gap: "0.4rem", alignItems: "center", cursor: "pointer" }}>
+                      <input type="checkbox" checked={isNewVessel} onChange={(e) => setIsNewVessel(e.target.checked)} />
+                      Add New Vessel
+                    </label>
+                  </div>
+                  {isNewVessel ? (
+                    <div className="two-up-grid" style={{ gap: "1rem" }}>
+                      <input value={newVesselName} onChange={(e) => setNewVesselName(e.target.value)} placeholder="Vessel Name (e.g. MSC Meraviglia)" />
+                      <input value={newVesselCode} onChange={(e) => setNewVesselCode(e.target.value)} placeholder="Code (e.g. VSL010)" />
+                    </div>
+                  ) : (
+                    <select id="manifest-vessel" value={selectedVesselId ?? ""} onChange={(event) => setSelectedVesselId(Number(event.target.value))}>
+                      {(etas?.etas ?? []).map((eta) => (
+                        <option key={eta.vessel_id} value={eta.vessel_id}>
+                          {eta.vessel_name} ({eta.vessel_code}) | ETA {formatDateTime(eta.eta_time)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div className="form-field">
                   <label htmlFor="manifest-file">CSV File</label>
