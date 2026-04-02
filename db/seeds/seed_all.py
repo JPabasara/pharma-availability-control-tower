@@ -1,4 +1,4 @@
-"""Seed all demo data from CSV files into the MySQL database.
+"""Seed all demo data from CSV files into the configured database.
 
 Usage:
     python db/seeds/seed_all.py
@@ -15,8 +15,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
-from sqlalchemy import text
-from apps.api.app.dependencies.database import engine, SessionLocal
+from apps.api.app.dependencies.database import SessionLocal
 from storage.models import (
     Base,
     SKU,
@@ -51,6 +50,7 @@ def read_csv(filename: str) -> list[dict]:
 
 def clear_all_tables(session):
     """Delete all data from all business tables (preserves schema)."""
+<<<<<<< HEAD
     bind = session.get_bind()
     
     if bind.dialect.name == "postgresql":
@@ -62,6 +62,10 @@ def clear_all_tables(session):
             session.execute(table.delete())
         session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 
+=======
+    for table in reversed(Base.metadata.sorted_tables):
+        session.execute(table.delete())
+>>>>>>> origin/main
     session.commit()
     print("  Cleared all tables.")
 

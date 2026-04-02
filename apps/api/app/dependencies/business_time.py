@@ -17,6 +17,7 @@ def get_business_now() -> datetime:
 
 
 def get_planning_dates() -> list[date]:
-    """Return the two business dates that define the current planning horizon."""
+    """Return the next two business dates that define the planning horizon."""
     business_today = get_business_now().date()
-    return [business_today, business_today + timedelta(days=1)]
+    day_one = business_today + timedelta(days=1)
+    return [day_one, day_one + timedelta(days=1)]

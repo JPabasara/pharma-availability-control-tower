@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { getDashboardSummary } from "@/lib/api";
-import { formatDateTime, formatInteger } from "@/lib/format";
+import { formatDate, formatDateTime, formatInteger } from "@/lib/format";
 import type { DashboardSummary } from "@/lib/types";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingPanel } from "@/components/LoadingPanel";
@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let ignore = false;
@@ -46,7 +47,15 @@ export default function DashboardPage() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [reloadKey]);
+
+  const chartData = summary
+    ? [
+        { name: "Available", value: summary.fleet_status.available, color: "var(--color-teal)" },
+        { name: "Assigned", value: summary.fleet_status.assigned, color: "var(--color-amber)" },
+        { name: "Unavailable", value: summary.fleet_status.unavailable, color: "var(--color-border-hover)" },
+      ]
+    : [];
 
   return (
     <div className="page-stack">
@@ -61,6 +70,9 @@ export default function DashboardPage() {
             <Link href="/inputs" className="button button-secondary">
               Review Inputs
             </Link>
+            <button type="button" className="button button-secondary" onClick={() => setReloadKey((current) => current + 1)} disabled={loading}>
+              Refresh
+            </button>
           </div>
         }
       />
@@ -132,18 +144,14 @@ export default function DashboardPage() {
 
             <SectionCard
               title="Fleet Status"
-              description="Availability from the latest lorry-state snapshot."
+              description={`Tomorrow's Schedule | ${formatDate(summary.fleet_status.business_date)}`}
             >
               <div className="split-layout" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "center" }}>
                 <div style={{ width: "100%", height: 240 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={[
-                          { name: 'Normal Available', value: summary.fleet_status.normal_available, color: 'var(--color-teal)' },
-                          { name: 'Reefer Available', value: summary.fleet_status.reefer_available, color: 'var(--color-primary)' },
-                          { name: 'Unavailable', value: summary.fleet_status.unavailable, color: 'var(--color-ink-muted)' },
-                        ]}
+                        data={chartData}
                         cx="50%"
                         cy="50%"
                         innerRadius={60}
@@ -151,11 +159,7 @@ export default function DashboardPage() {
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        {[
-                          { name: 'Normal Available', value: summary.fleet_status.normal_available, color: 'var(--color-teal)' },
-                          { name: 'Reefer Available', value: summary.fleet_status.reefer_available, color: 'var(--color-primary)' },
-                          { name: 'Unavailable', value: summary.fleet_status.unavailable, color: 'var(--color-border-hover)' },
-                        ].map((entry, index) => (
+                        {chartData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
@@ -175,15 +179,16 @@ export default function DashboardPage() {
                 <div className="cards-grid" style={{ gridTemplateColumns: "1fr" }}>
                   <div className="list-card">
                     <h4>{formatInteger(summary.fleet_status.available)} available</h4>
-                    <p>
-                      {formatInteger(summary.fleet_status.normal_available)} normal and{" "}
-                      {formatInteger(summary.fleet_status.reefer_available)} reefer lorries are currently ready.
-                    </p>
+                    <p>Lorries currently free to be planned for tomorrow.</p>
+                  </div>
+                  <div className="list-card">
+                    <h4>{formatInteger(summary.fleet_status.assigned)} assigned</h4>
+                    <p>Lorries already committed to an approved Day 1 run.</p>
                   </div>
                   <div className="list-card">
                     <h4>{formatInteger(summary.fleet_status.unavailable)} unavailable</h4>
                     <p>
-                      Total fleet size is {formatInteger(summary.fleet_status.total)} vehicles across the 48-hour planning horizon.
+                      Total fleet size is {formatInteger(summary.fleet_status.total)} vehicles in tomorrow&apos;s horizon.
                     </p>
                   </div>
                 </div>

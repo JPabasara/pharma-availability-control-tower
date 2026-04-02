@@ -9,12 +9,17 @@ Routes:
     GET /api/v1/inputs/sales-history         — sales history with 48h forecasts
     GET /api/v1/inputs/lorry-state           — current lorry availability
     GET /api/v1/inputs/etas                  — all active ETAs
+    POST /api/v1/inputs/refresh-all          — mixed-mode refresh across all families
+    POST /api/v1/inputs/refresh/{family}     — refresh one family
 """
+
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from apps.api.app.dependencies.database import get_db
+from apps.api.app.input_refresh import service as input_refresh_service
 from integrations.inbound.manifest_reader import reader as manifest_reader
 from integrations.inbound.warehouse_stock_reader import reader as wh_reader
 from integrations.inbound.dc_stock_reader import reader as dc_reader
@@ -29,7 +34,12 @@ router = APIRouter(prefix="/api/v1/inputs", tags=["inputs"])
 def get_manifests(db: Session = Depends(get_db)):
     """Get all active vessel manifests with line items."""
     contracts = manifest_reader.get_all_active_contracts(db)
-    return {"manifests": contracts, "count": len(contracts)}
+    return {
+        "manifests": contracts,
+        "count": len(contracts),
+        "latest_snapshot_time": contracts[0]["snapshot_time"] if contracts else None,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/manifests/{manifest_id}")
@@ -70,7 +80,12 @@ def get_dc_stock(dc_id: int, db: Session = Depends(get_db)):
 def get_sales_history(db: Session = Depends(get_db)):
     """Get sales history with 48-hour demand forecasts per DC per SKU."""
     forecasts = sales_reader.to_contract(db)
-    return {"forecasts": forecasts, "count": len(forecasts)}
+    return {
+        "forecasts": forecasts,
+        "count": len(forecasts),
+        "lookback_days": 30,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/lorry-state")
@@ -86,4 +101,32 @@ def get_lorry_state(db: Session = Depends(get_db)):
 def get_etas(db: Session = Depends(get_db)):
     """Get latest ETAs for all vessels with active manifests."""
     etas = eta_provider.get_all_active_etas(db)
-    return {"etas": etas, "count": len(etas)}
+    return {
+        "etas": etas,
+        "count": len(etas),
+        "latest_fetched_at": max((eta["fetched_at"] for eta in etas), default=None),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/refresh-all")
+def refresh_all_inputs(db: Session = Depends(get_db)):
+    """Create fresh current-state snapshots where appropriate for all families."""
+    try:
+        return input_refresh_service.refresh_all(db)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail={"message": str(exc)}) from exc
+
+
+@router.post("/refresh/{family}")
+def refresh_input_family(family: str, db: Session = Depends(get_db)):
+    """Refresh one input family using the mixed-mode planner refresh policy."""
+    try:
+        result = input_refresh_service.refresh_family(db, family)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail={"message": str(exc)}) from exc
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result)
+    return result

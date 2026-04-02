@@ -38,6 +38,8 @@ expected = [
     ("GET", "/api/v1/inputs/sales-history"),
     ("GET", "/api/v1/inputs/lorry-state"),
     ("GET", "/api/v1/inputs/etas"),
+    ("POST", "/api/v1/inputs/refresh-all"),
+    ("POST", "/api/v1/inputs/refresh/{family}"),
     ("POST", "/api/v1/orchestration/generate-plan"),
     ("GET", "/api/v1/orchestration/runs"),
     ("GET", "/api/v1/orchestration/runs/{run_id}"),
