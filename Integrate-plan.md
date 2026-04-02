@@ -196,6 +196,10 @@ Canonical lookup sources:
 - ETA snapshots
 - lorry day-state overlays
 
+Route graph note:
+- For the first deployment, the `M3` route graph will come from seeded master data loaded from [data/seed/route_edges.csv](c:/Users/jpaba/Documents/GitHub/pharma-availability-control-tower/data/seed/route_edges.csv).
+- `M3` should use `travel_time_hours` and `cost` from the persisted `route_edges` table as optimization inputs for balanced and cost-aware candidate plans.
+
 Canonicalization rule:
 - The platform owns ID/code mapping.
 - Real model code must adapt to platform identifiers, not the reverse.
@@ -273,7 +277,8 @@ Purpose:
 ## Explicit Non-Goals
 - No frontend redesign during integration.
 - No planner API breaking change during initial integration.
-- No runtime dependence on synthetic CSV datasets.
+- No runtime dependence on synthetic CSV datasets for `M1` or `M3`.
+- No direct synthetic-CSV inference path in production orchestration once live DB-backed adapters are in place.
 - No runtime retraining inside orchestration.
 - No replacement of current planner-flow approval/override mechanics.
 
@@ -283,9 +288,13 @@ Purpose:
    - `M1` is a deterministic mathematical engine.
    - `M3` is a deterministic OR-Tools engine.
 
-2. Synthetic datasets remain development-only.
-   - They are not the production runtime source.
-   - They may still be kept for local experimentation or model evolution.
+2. Synthetic data is used selectively in the first deployment.
+   - `M2` synthetic data is allowed for initial bootstrap because it is an XGBoost ML model.
+   - `M2` synthetic data may be used offline to train or regenerate the committed artifacts used in the first deployment.
+   - `M2` runtime inference should still be moved onto live DB-backed inputs through the adapter layer.
+   - `M1` does not require synthetic deployment data and should run from live platform inputs.
+   - `M3` does not require synthetic deployment data and should run from live operational inputs plus the seeded route graph.
+   - `M1` and `M3` synthetic datasets remain development and testing fixtures only.
 
 3. `M1` band mapping must be normalized to current planner vocabulary:
    - assumed default:
@@ -310,7 +319,7 @@ Purpose:
 6. `M3` candidate versions will be generated as:
    - Plan A: urgency-maximizing variant, marked `is_best`
    - Plan B: balanced coverage variant
-   - Plan C: cost-aware / travel-aware variant
+   - Plan C: cost-aware / travel-aware variant using seeded route-edge `travel_time_hours` and `cost`
 
 ## Acceptance Criteria
 - Existing planner endpoints remain response-compatible.

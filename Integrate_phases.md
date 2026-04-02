@@ -46,6 +46,7 @@ Create the safe platform foundation for phased rollout without changing planner 
 - Add additive traceability migrations.
 - Freeze contract tests for current planner/API behavior.
 - Refactor engine bridge so `M3` can stop depending on `M1`.
+- Confirm the seeded route graph from `data/seed/route_edges.csv` is available through the `route_edges` master table for later `M3` optimization.
 - Keep all engines in `stub` mode after deployment.
 
 ## Implementation Changes
@@ -58,6 +59,7 @@ Create the safe platform foundation for phased rollout without changing planner 
   - `xgboost`
   - `ortools`
 - Add schema columns for normalized + raw trace persistence.
+- Keep `M2` synthetic dataset usage explicitly limited to offline bootstrap/training, not general orchestration runtime.
 - Add tests that lock current response shapes for:
   - M1 planner results
   - M2 planner requests
@@ -93,6 +95,7 @@ Replace stub `M2` with the real XGBoost-backed inference flow while keeping `M1`
 - Load committed classifier/regressor artifacts at runtime.
 - Normalize `M2` real output to existing planner contract.
 - Persist raw model trace fields in `m2_requests`.
+- Allow the first deployment to rely on the existing synthetic `M2` training dataset only for artifact bootstrap/regeneration if needed.
 
 ## Inputs to Build from Live Data
 - DC stock snapshots:
@@ -117,7 +120,8 @@ Replace stub `M2` with the real XGBoost-backed inference flow while keeping `M1`
 
 ## Key Decisions in This Phase
 - Real `M2` runtime must use backend canonical DC/SKU identities.
-- No runtime CSV reading for production orchestration.
+- Synthetic `M2` CSV data is acceptable only for first-deployment artifact bootstrap, not as the planner orchestration input source.
+- No runtime CSV reading for production orchestration after the adapter path is in place.
 - Output normalization will preserve current fields:
   - `dc_id`
   - `sku_id`
@@ -175,6 +179,7 @@ Replace stub `M1` with the real planner-only scoring engine after real `M2` is s
 - Remove `M1` as an input to `M3` in orchestration and engine bridge.
 - Normalize `M1` real output back to current planner contract.
 - Persist score breakdown / raw feature trace for auditability.
+- Keep `M1` synthetic datasets out of deployment runtime and use them only as development fixtures if needed.
 
 ## Inputs to Build from Live Data
 - manifest lines
@@ -193,6 +198,7 @@ Replace stub `M1` with the real planner-only scoring engine after real `M2` is s
 - `M1` is planner-facing only.
 - `M3` must be refactored now to run without `M1`.
 - Real `M1` output bands will be normalized into lowercase planner vocabulary.
+- `M1` does not require synthetic deployment data.
 
 ## Database Work in This Phase
 - Add `m1_results` trace fields:
@@ -258,7 +264,7 @@ Replace stub `M3` with the OR-Tools planner while preserving the current candida
 - real `M2` requests
 - warehouse effective stock
 - lorry day-state availability
-- route graph
+- route graph loaded from the persisted `route_edges` master data seeded initially from `data/seed/route_edges.csv`
 - SKU reefer requirements
 - canonical lorry/DC/SKU identities
 
@@ -274,13 +280,14 @@ Plan B:
 
 Plan C:
 - cost-aware variant
-- solver rerun with cost/travel penalty emphasis
+- solver rerun with cost/travel penalty emphasis using `travel_time_hours` and `cost` from the seeded route graph
 
 ## Key Decisions in This Phase
 - `M3` does not consume `M1`.
 - The current planner candidate-version contract stays intact.
 - The current run/day schema stays intact.
 - Raw solver metadata is stored in plan version trace fields.
+- `M3` does not require synthetic deployment data; the seeded route graph is the live optimization baseline for the first deployment.
 
 ## Database Work in This Phase
 - Add `m3_plan_versions` metadata fields:
