@@ -510,7 +510,7 @@ def run(
         version_number=1,
         plan_name="Plan A — Urgency Priority",
         generation_strategy="urgency_max",
-        is_best=True,
+        is_best=False,
         runs=runs_a or [],
         objective_value=obj_a,
         solver_trace=trace_a,
@@ -555,4 +555,10 @@ def run(
         f"C({len(runs_c or [])} runs)"
     )
 
-    return [plan_a, plan_b, plan_c]
+    plans = [plan_a, plan_b, plan_c]
+    
+    # Dynamically select the plan with the highest normalized score as 'best'
+    best_plan = max(plans, key=lambda p: p["score"])
+    best_plan["is_best"] = True
+
+    return plans
