@@ -28,6 +28,21 @@ export function formatDateTime(value: string | null | undefined) {
   }).format(date);
 }
 
+export function formatDate(value: string | null | undefined) {
+  if (!value) {
+    return "Not available";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+  }).format(date);
+}
+
 export function formatRelativeHours(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(value)) {
     return "Unknown";
@@ -49,6 +64,15 @@ export function toneFromSeverity(value: string) {
       return "warning";
     case "success":
       return "success";
+    case "available":
+    case "active":
+    case "approved":
+      return "success";
+    case "assigned":
+      return "warning";
+    case "unavailable":
+    case "rejected":
+      return "neutral";
     default:
       return "info";
   }

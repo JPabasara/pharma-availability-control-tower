@@ -8,6 +8,8 @@ import type {
   EngineRunsResponse,
   EtaResponse,
   GeneratePlanResponse,
+  InputRefreshFamily,
+  InputRefreshResponse,
   LorryStateContract,
   LorryAvailabilityResponse,
   M1ResultsResponse,
@@ -165,6 +167,18 @@ export function getEtas() {
   return apiFetch<EtaResponse>("/api/v1/inputs/etas");
 }
 
+export function refreshAllInputs() {
+  return apiFetch<InputRefreshResponse>("/api/v1/inputs/refresh-all", {
+    method: "POST",
+  });
+}
+
+export function refreshInputFamily(family: InputRefreshFamily) {
+  return apiFetch<InputRefreshResponse>(`/api/v1/inputs/refresh/${family}`, {
+    method: "POST",
+  });
+}
+
 export function getEngineRuns(engineType?: "m1" | "m2" | "m3", limit = 20) {
   return apiFetch<EngineRunsResponse>("/api/v1/orchestration/runs", undefined, {
     engine_type: engineType,
@@ -266,10 +280,14 @@ export function getLorryHorizon() {
   return apiFetch<LorryStateContract>("/api/v1/demo-operations/lorries/horizon");
 }
 
-export function setLorryAvailability(lorryId: number, status: "available" | "unavailable") {
+export function setLorryAvailability(
+  lorryId: number,
+  dispatch_day: number,
+  status: "available" | "unavailable"
+) {
   return apiFetch<LorryAvailabilityResponse>(`/api/v1/demo-operations/lorries/${lorryId}/availability`, {
     method: "POST",
-    body: JSON.stringify({ status, actor: "planner-ui" }),
+    body: JSON.stringify({ dispatch_day, status, actor: "planner-ui" }),
   });
 }
 

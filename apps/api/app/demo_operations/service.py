@@ -211,9 +211,17 @@ def post_dc_sale(
         return {
             "success": False,
             "message": f"DC {dc.code} has insufficient physical stock for {sku.code}. Available: {available}.",
+            "dc_id": dc_id,
+            "dc_code": dc.code,
+            "sku_id": sku_id,
+            "sku_code": sku.code,
+            "available_quantity": available,
+            "requested_quantity": quantity,
+            "shortfall_quantity": max(quantity - available, 0),
         }
 
     now = datetime.now(timezone.utc)
+    available_before = stock_item.physical_quantity
     stock_item.physical_quantity -= quantity
     stock_item.effective_quantity = stock_item.physical_quantity + stock_item.in_transit_quantity
     session.add(
@@ -251,7 +259,11 @@ def post_dc_sale(
         "success": True,
         "message": f"Recorded sale of {quantity} units of {sku.code} at {dc.code}.",
         "dc_id": dc_id,
+        "dc_code": dc.code,
         "sku_id": sku_id,
+        "sku_code": sku.code,
+        "available_before": available_before,
+        "remaining_physical": stock_item.physical_quantity,
         "quantity_sold": quantity,
     }
 
@@ -264,47 +276,52 @@ def set_lorry_availability(
     session: Session,
     *,
     lorry_id: int,
+    dispatch_day: int,
     status: str,
     actor: str = "demo-ops",
 ) -> dict:
     if status not in {"available", "unavailable"}:
         return {"success": False, "message": "Status must be available or unavailable."}
+    if dispatch_day not in {1, 2}:
+        return {"success": False, "message": "dispatch_day must be 1 or 2."}
 
     lorry = session.query(Lorry).filter(Lorry.id == lorry_id).first()
     if not lorry:
         return {"success": False, "message": f"Lorry {lorry_id} not found."}
 
     planning_dates = get_planning_dates()
+    target_date = planning_dates[dispatch_day - 1]
     existing = (
         session.query(DemoLorryDayState)
         .filter(
             DemoLorryDayState.lorry_id == lorry_id,
-            DemoLorryDayState.business_date.in_(planning_dates),
+            DemoLorryDayState.business_date == target_date,
         )
-        .all()
+        .first()
     )
-    if any(row.status == "assigned" for row in existing):
+    if existing and existing.status == "assigned":
         return {
             "success": False,
-            "message": f"Lorry {lorry.registration} is already assigned on the current 2-day horizon.",
+            "message": f"Lorry {lorry.registration} is already assigned on Day {dispatch_day}.",
+            "dispatch_day": dispatch_day,
+            "business_date": target_date.isoformat(),
+            "status": existing.status,
         }
 
     now = datetime.now(timezone.utc)
-    by_date = {row.business_date: row for row in existing}
-    for business_date in planning_dates:
-        row = by_date.get(business_date)
-        if row:
-            row.status = status
-            row.source = "manual"
-        else:
-            session.add(
-                DemoLorryDayState(
-                    lorry_id=lorry_id,
-                    business_date=business_date,
-                    status=status,
-                    source="manual",
-                )
+    previous_status = existing.status if existing else lorry.status
+    if existing:
+        existing.status = status
+        existing.source = "manual"
+    else:
+        session.add(
+            DemoLorryDayState(
+                lorry_id=lorry_id,
+                business_date=target_date,
+                status=status,
+                source="manual",
             )
+        )
 
     session.add(
         AuditLog(
@@ -314,17 +331,23 @@ def set_lorry_availability(
             actor=actor,
             timestamp=now,
             details={
-                "business_dates": [value.isoformat() for value in planning_dates],
+                "dispatch_day": dispatch_day,
+                "business_date": target_date.isoformat(),
+                "previous_status": previous_status,
+                "new_status": status,
             },
         )
     )
     session.commit()
     return {
         "success": True,
-        "message": f"Lorry {lorry.registration} set to {status} for the next two planning days.",
+        "message": f"Lorry {lorry.registration} set to {status} on Day {dispatch_day}.",
         "lorry_id": lorry_id,
+        "registration": lorry.registration,
+        "dispatch_day": dispatch_day,
+        "business_date": target_date.isoformat(),
+        "previous_status": previous_status,
         "status": status,
-        "business_dates": [value.isoformat() for value in planning_dates],
     }
 
 
