@@ -1,10 +1,10 @@
-"""Orchestration Service — the main pipeline that assembles inputs and runs M1→M2→M3.
+"""Orchestration Service — the main pipeline that assembles inputs and runs M2→M1→M3.
 
 Triggered by the planner clicking "Generate Plan". This service:
 1. Reads all snapshot data via readers
 2. Runs M2 (needs forecasts + DC stock)
-3. Runs M1 (needs manifests + WH stock + M2 results + ETAs)
-4. Runs M3 (needs M1 + M2 + WH stock + lorries + routes)
+3. Runs M1 (needs manifests + WH stock + M2 results + ETAs) — planner-facing only
+4. Runs M3 (needs M2 + WH stock + lorries + routes + SKU metadata) — does NOT use M1
 5. Persists all engine_run records and results
 """
 
@@ -105,11 +105,14 @@ def generate_plan(session: Session) -> dict:
         all_manifest_lines.extend(mc["lines"])
 
     # ── Step 2: Run M2 ─────────────────────────────────────────────────
+    m2_mode = engine_bridge.get_engine_mode("m2")
     m2_run = EngineRun(
         engine_type="m2",
         started_at=now,
         status="running",
         input_snapshot_ids=input_snapshot_ids,
+        engine_mode=m2_mode,
+        engine_impl="m2_xgboost_v1" if m2_mode == "real" else "stub",
     )
     session.add(m2_run)
     session.flush()
@@ -118,25 +121,44 @@ def generate_plan(session: Session) -> dict:
 
     # Persist M2 results
     for req in m2_results:
-        session.add(M2Request(
+        m2_req = M2Request(
             engine_run_id=m2_run.id,
             dc_id=req["dc_id"],
             sku_id=req["sku_id"],
             requested_quantity=req["requested_quantity"],
             urgency=req["urgency"],
             required_by=datetime.fromisoformat(req["required_by"]),
-        ))
+        )
+        # Persist trace fields if present (from real engine)
+        if "urgency_score" in req:
+            m2_req.urgency_score = req["urgency_score"]
+        if "shortage_probability" in req:
+            m2_req.shortage_probability = req["shortage_probability"]
+        if "hours_until_shortage" in req:
+            m2_req.hours_until_shortage = req["hours_until_shortage"]
+        if "effective_stock_at_run" in req:
+            m2_req.effective_stock_at_run = req["effective_stock_at_run"]
+        if "projected_48h_sales" in req:
+            m2_req.projected_48h_sales = req["projected_48h_sales"]
+        if "safety_stock" in req:
+            m2_req.safety_stock = req["safety_stock"]
+        if "raw_features" in req:
+            m2_req.raw_features = req["raw_features"]
+        session.add(m2_req)
 
     m2_run.completed_at = datetime.now(timezone.utc)
     m2_run.status = "completed"
     session.flush()
 
-    # ── Step 3: Run M1 ─────────────────────────────────────────────────
+    # ── Step 3: Run M1 (planner-facing only, not used by M3) ──────────
+    m1_mode = engine_bridge.get_engine_mode("m1")
     m1_run = EngineRun(
         engine_type="m1",
         started_at=datetime.now(timezone.utc),
         status="running",
         input_snapshot_ids=input_snapshot_ids,
+        engine_mode=m1_mode,
+        engine_impl="m1_math_v1" if m1_mode == "real" else "stub",
     )
     session.add(m1_run)
     session.flush()
@@ -151,35 +173,44 @@ def generate_plan(session: Session) -> dict:
 
     # Persist M1 results
     for res in m1_results:
-        session.add(M1Result(
+        m1_res = M1Result(
             engine_run_id=m1_run.id,
             manifest_line_id=res["manifest_line_id"],
             sku_id=res["sku_id"],
             priority_score=res["priority_score"],
             priority_band=res["priority_band"],
             reefer_required=res["reefer_required"],
-        ))
+        )
+        # Persist trace fields if present (from real engine)
+        if "score_breakdown" in res:
+            m1_res.score_breakdown = res["score_breakdown"]
+        if "raw_features" in res:
+            m1_res.raw_features = res["raw_features"]
+        session.add(m1_res)
 
     m1_run.completed_at = datetime.now(timezone.utc)
     m1_run.status = "completed"
     session.flush()
 
-    # ── Step 4: Run M3 ─────────────────────────────────────────────────
+    # ── Step 4: Run M3 (does NOT use M1 results) ──────────────────────
+    m3_mode = engine_bridge.get_engine_mode("m3")
     m3_run = EngineRun(
         engine_type="m3",
         started_at=datetime.now(timezone.utc),
         status="running",
         input_snapshot_ids=input_snapshot_ids,
+        engine_mode=m3_mode,
+        engine_impl="m3_ortools_v1" if m3_mode == "real" else "stub",
     )
     session.add(m3_run)
     session.flush()
 
     m3_plans = engine_bridge.run_m3(
-        m1_results,
         m2_results,
         wh_contract or {"items": []},
         lorry_contract or {"lorries": []},
         route_graph,
+        sku_metadata,
     )
 
     # Persist M3 plan versions
@@ -190,6 +221,11 @@ def generate_plan(session: Session) -> dict:
             plan_status="draft",
             score=plan.get("score"),
             is_best=plan.get("is_best", False),
+            # Traceability fields (from real engine)
+            plan_name=plan.get("plan_name"),
+            generation_strategy=plan.get("generation_strategy"),
+            objective_value=plan.get("objective_value"),
+            solver_trace=plan.get("solver_trace"),
         )
         session.add(plan_version)
         session.flush()

@@ -1,0 +1,9 @@
+lorry_id,lorry_type,capacity_units
+L-01,normal,500
+L-02,normal,500
+L-03,normal,500
+L-04,normal,500
+L-05,normal,500
+L-R1,reefer,350
+L-R2,reefer,350
+L-R3,reefer,350
