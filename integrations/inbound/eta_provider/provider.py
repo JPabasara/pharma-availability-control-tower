@@ -20,6 +20,17 @@ def get_latest_eta(session: Session, vessel_id: int) -> Optional[ETASnapshot]:
     )
 
 
+def get_active_vessel_ids(session: Session) -> list[int]:
+    """Return vessel ids that currently have active manifests."""
+    active_vessels = (
+        session.query(ManifestSnapshot.vessel_id)
+        .filter(ManifestSnapshot.status == "active")
+        .distinct()
+        .all()
+    )
+    return [value[0] for value in active_vessels]
+
+
 def get_all_active_etas(session: Session) -> list[dict]:
     """Get latest ETAs for all vessels that have active manifests.
 
@@ -37,13 +48,7 @@ def get_all_active_etas(session: Session) -> list[dict]:
         ]
     """
     # Find vessels with active manifests
-    active_vessels = (
-        session.query(ManifestSnapshot.vessel_id)
-        .filter(ManifestSnapshot.status == "active")
-        .distinct()
-        .all()
-    )
-    vessel_ids = [v[0] for v in active_vessels]
+    vessel_ids = get_active_vessel_ids(session)
 
     etas = []
     now = datetime.now(timezone.utc)
@@ -71,7 +76,7 @@ def get_all_active_etas(session: Session) -> list[dict]:
     return etas
 
 
-def refresh_eta(session: Session, vessel_id: int) -> dict:
+def refresh_eta(session: Session, vessel_id: int, *, auto_commit: bool = True) -> dict:
     """Generate a new mock ETA for a vessel and persist it.
 
     Mock logic: current time + random offset between 4-48 hours.
@@ -90,7 +95,10 @@ def refresh_eta(session: Session, vessel_id: int) -> dict:
         source="mock_api",
     )
     session.add(eta_snapshot)
-    session.commit()
+    if auto_commit:
+        session.commit()
+    else:
+        session.flush()
 
     vessel = session.query(Vessel).filter(Vessel.id == vessel_id).first()
 
@@ -102,6 +110,19 @@ def refresh_eta(session: Session, vessel_id: int) -> dict:
         "fetched_at": now.isoformat(),
         "hours_until_arrival": round(offset_hours, 1),
         "source": "mock_api",
+    }
+
+
+def refresh_all_active_etas(session: Session, *, auto_commit: bool = True) -> dict:
+    """Create fresh ETA snapshots for all vessels with active manifests."""
+    vessel_ids = get_active_vessel_ids(session)
+    records = [refresh_eta(session, vessel_id, auto_commit=False) for vessel_id in vessel_ids]
+    if auto_commit:
+        session.commit()
+    return {
+        "count": len(records),
+        "etas": records,
+        "latest_fetched_at": max((record["fetched_at"] for record in records), default=None),
     }
 
 

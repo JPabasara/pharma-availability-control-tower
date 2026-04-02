@@ -21,11 +21,11 @@ export type DashboardSummary = {
   active_manifests: number;
   latest_engine_run: EngineRunSummary | null;
   fleet_status: {
+    business_date: string;
     total: number;
     available: number;
     unavailable: number;
-    reefer_available: number;
-    normal_available: number;
+    assigned: number;
   };
   alerts: DashboardAlert[];
   alert_count: number;
@@ -54,6 +54,8 @@ export type ManifestContract = {
 export type ManifestResponse = {
   manifests: ManifestContract[];
   count: number;
+  latest_snapshot_time?: string | null;
+  generated_at?: string | null;
 };
 
 export type WarehouseStockItem = {
@@ -111,6 +113,8 @@ export type SalesForecast = {
 export type SalesHistoryResponse = {
   forecasts: SalesForecast[];
   count: number;
+  generated_at?: string | null;
+  lookback_days?: number;
 };
 
 export type LorryDayState = {
@@ -151,6 +155,8 @@ export type EtaRecord = {
 export type EtaResponse = {
   etas: EtaRecord[];
   count: number;
+  latest_fetched_at?: string | null;
+  generated_at?: string | null;
 };
 
 export type EngineRunSummary = {
@@ -507,16 +513,55 @@ export type DcSaleResponse = {
   success: boolean;
   message: string;
   dc_id: number;
+  dc_code?: string;
   sku_id: number;
+  sku_code?: string;
   quantity_sold: number;
+  available_before?: number;
+  remaining_physical?: number;
 };
 
 export type LorryAvailabilityResponse = {
   success: boolean;
   message: string;
   lorry_id: number;
+  registration?: string;
+  dispatch_day: number;
+  business_date: string;
+  previous_status?: string;
   status: string;
-  business_dates: string[];
+};
+
+export type InputRefreshFamily =
+  | "manifests"
+  | "warehouse"
+  | "dc"
+  | "sales"
+  | "lorries"
+  | "etas";
+
+export type InputRefreshFamilyResult = {
+  family: InputRefreshFamily;
+  mode: "captured" | "reloaded";
+  count?: number;
+  item_count?: number;
+  lorry_count?: number;
+  snapshot_id?: number;
+  snapshot_ids?: number[];
+  snapshot_count?: number;
+  snapshot_time?: string | null;
+  latest_snapshot_time?: string | null;
+  latest_fetched_at?: string | null;
+  generated_at?: string | null;
+  lookback_days?: number;
+};
+
+export type InputRefreshResponse = {
+  success: boolean;
+  scope: InputRefreshFamily | "all";
+  generated_at: string;
+  message: string;
+  families: Partial<Record<InputRefreshFamily, InputRefreshFamilyResult>>;
 };
 
 export type OpenExecutionStop = {
