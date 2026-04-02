@@ -18,6 +18,7 @@ class DcSaleRequest(BaseModel):
 
 
 class LorryAvailabilityRequest(BaseModel):
+    dispatch_day: int
     status: str
     actor: str = "demo-ops"
 
@@ -36,7 +37,7 @@ async def upload_manifest(
         csv_bytes=await file.read(),
     )
     if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["message"])
+        raise HTTPException(status_code=400, detail=result)
     return result
 
 
@@ -44,7 +45,7 @@ async def upload_manifest(
 def arrive_manifest(manifest_id: int, db: Session = Depends(get_db)):
     result = service.arrive_manifest(db, manifest_id)
     if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["message"])
+        raise HTTPException(status_code=400, detail=result)
     return result
 
 
@@ -58,7 +59,7 @@ def post_dc_sale(body: DcSaleRequest, db: Session = Depends(get_db)):
         actor=body.actor,
     )
     if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["message"])
+        raise HTTPException(status_code=400, detail=result)
     return result
 
 
@@ -79,11 +80,12 @@ def set_lorry_availability(
     result = service.set_lorry_availability(
         db,
         lorry_id=lorry_id,
+        dispatch_day=body.dispatch_day,
         status=body.status,
         actor=body.actor,
     )
     if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["message"])
+        raise HTTPException(status_code=400, detail=result)
     return result
 
 
@@ -97,5 +99,5 @@ def get_open_execution_stops(db: Session = Depends(get_db)):
 def arrive_stop(plan_stop_id: int, db: Session = Depends(get_db)):
     result = service.arrive_stop(db, plan_stop_id)
     if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["message"])
+        raise HTTPException(status_code=400, detail=result)
     return result

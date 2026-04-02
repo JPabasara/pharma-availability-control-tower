@@ -54,18 +54,53 @@ function parseApiError(error: unknown): NoticeState {
   if (error instanceof ApiError) {
     const detail = error.detail as
       | {
-          detail?: { message?: string; validation?: { errors?: string[] } };
+          detail?: {
+            message?: string;
+            validation?: { errors?: string[] };
+            available_quantity?: number;
+            requested_quantity?: number;
+            shortfall_quantity?: number;
+            business_date?: string;
+            dispatch_day?: number;
+          };
           message?: string;
           validation?: { errors?: string[] };
+          available_quantity?: number;
+          requested_quantity?: number;
+          shortfall_quantity?: number;
+          business_date?: string;
+          dispatch_day?: number;
         }
       | undefined;
     const nested = detail?.detail;
     const validation = nested?.validation ?? detail?.validation;
+    const availableQuantity = nested?.available_quantity ?? detail?.available_quantity;
+    const requestedQuantity = nested?.requested_quantity ?? detail?.requested_quantity;
+    const shortfallQuantity = nested?.shortfall_quantity ?? detail?.shortfall_quantity;
+    const businessDate = nested?.business_date ?? detail?.business_date;
+    const dispatchDay = nested?.dispatch_day ?? detail?.dispatch_day;
+    const quantityItems =
+      availableQuantity !== undefined && requestedQuantity !== undefined
+        ? [
+            `Available: ${formatInteger(availableQuantity)}`,
+            `Requested: ${formatInteger(requestedQuantity)}`,
+            `Shortfall: ${formatInteger(shortfallQuantity ?? 0)}`,
+          ]
+        : [];
+    const timingItems =
+      businessDate && dispatchDay
+        ? [`Day ${dispatchDay}: ${businessDate}`]
+        : [];
     return {
       tone: "error",
       title: "Operation failed",
       message: nested?.message ?? detail?.message ?? error.message,
-      items: validation?.errors?.length ? validation.errors : undefined,
+      items:
+        validation?.errors?.length
+          ? validation.errors
+          : quantityItems.length || timingItems.length
+            ? [...quantityItems, ...timingItems]
+            : undefined,
     };
   }
   return {
@@ -161,6 +196,10 @@ export default function DemoStatePage() {
     () => dcStock?.dcs.find((dc) => dc.dc_id === selectedDcId) ?? null,
     [dcStock, selectedDcId]
   );
+  const selectedSku = useMemo(
+    () => selectedDc?.items.find((item) => item.sku_id === selectedSkuId) ?? null,
+    [selectedDc, selectedSkuId]
+  );
 
   useEffect(() => {
     if (!selectedDc?.items.length) {
@@ -170,6 +209,17 @@ export default function DemoStatePage() {
       setSelectedSkuId(selectedDc.items[0].sku_id);
     }
   }, [selectedDc, selectedSkuId]);
+
+  const saleValidationMessage = useMemo(() => {
+    const quantity = Number(saleQuantity);
+    if (!selectedSku || Number.isNaN(quantity) || quantity <= 0) {
+      return null;
+    }
+    if (quantity <= selectedSku.physical) {
+      return null;
+    }
+    return `Only ${formatInteger(selectedSku.physical)} units are physically available. Reduce this sale by ${formatInteger(quantity - selectedSku.physical)} units.`;
+  }, [saleQuantity, selectedSku]);
 
   async function handleManifestUpload() {
     if (!manifestName.trim() || !selectedVesselId || !manifestFile) {
@@ -224,11 +274,23 @@ export default function DemoStatePage() {
       });
       return;
     }
+    if (saleValidationMessage) {
+      setNotice({
+        tone: "error",
+        title: "DC sale exceeds current physical stock",
+        message: saleValidationMessage,
+      });
+      return;
+    }
     setActionLoading(true);
     setNotice(null);
     try {
       const response = await postDcSale(selectedDcId, selectedSkuId, quantity);
-      setNotice({ tone: "success", title: "DC sale posted", message: response.message });
+      setNotice({
+        tone: "success",
+        title: "DC sale posted",
+        message: `${response.message} Remaining physical: ${formatInteger(response.remaining_physical)} units.`,
+      });
       setSaleQuantity("0");
       setReloadKey((current) => current + 1);
     } catch (cause) {
@@ -238,12 +300,20 @@ export default function DemoStatePage() {
     }
   }
 
-  async function handleLorryToggle(lorryId: number, targetStatus: "available" | "unavailable") {
+  async function handleLorryToggle(
+    lorryId: number,
+    dispatchDay: number,
+    targetStatus: "available" | "unavailable"
+  ) {
     setActionLoading(true);
     setNotice(null);
     try {
-      const response = await setLorryAvailability(lorryId, targetStatus);
-      setNotice({ tone: "success", title: "Lorry horizon updated", message: response.message });
+      const response = await setLorryAvailability(lorryId, dispatchDay, targetStatus);
+      setNotice({
+        tone: "success",
+        title: "Lorry day updated",
+        message: `${response.message} Business date: ${response.business_date}.`,
+      });
       setReloadKey((current) => current + 1);
     } catch (cause) {
       setNotice(parseApiError(cause));
@@ -478,8 +548,21 @@ export default function DemoStatePage() {
                   <input id="dc-qty" type="number" min={1} value={saleQuantity} onChange={(event) => setSaleQuantity(event.target.value)} />
                 </div>
               </div>
+              {selectedSku ? (
+                <p className="field-feedback field-feedback-success">
+                  Current physical stock for {selectedSku.sku_code}: {formatInteger(selectedSku.physical)} units.
+                </p>
+              ) : null}
+              {saleValidationMessage ? (
+                <p className="field-feedback field-feedback-error">{saleValidationMessage}</p>
+              ) : null}
               <div className="toolbar">
-                <button type="button" className="button button-primary" onClick={() => void handleDcSale()} disabled={actionLoading}>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => void handleDcSale()}
+                  disabled={actionLoading || Boolean(saleValidationMessage)}
+                >
                   Post Sale
                 </button>
               </div>
@@ -506,32 +589,57 @@ export default function DemoStatePage() {
       ) : null}
 
       {workspace === "lorries" ? (
-        <SectionCard title="Lorry Control" description="Toggle manual availability for the next two planning days unless the lorry is already assigned by an approved plan.">
+        <SectionCard title="Lorry Control" description="Toggle manual availability day by day across the next two planning dates unless that day is already assigned by an approved plan.">
           {lorryHorizon ? (
             <DataTable
               columns={[
                 { key: "reg", header: "Registration", render: (row) => row.registration },
                 { key: "type", header: "Type", render: (row) => <StatusPill value={row.lorry_type} tone="info" /> },
-                { key: "day1", header: "Day 1", render: (row) => <StatusPill value={row.day1_status} /> },
-                { key: "day2", header: "Day 2", render: (row) => <StatusPill value={row.day2_status} /> },
                 {
-                  key: "action",
-                  header: "Action",
+                  key: "day1",
+                  header: "Day 1",
                   render: (row) => {
-                    const isAssigned = row.day1_status === "assigned" || row.day2_status === "assigned";
-                    const targetStatus =
-                      row.day1_status === "unavailable" && row.day2_status === "unavailable"
-                        ? "available"
-                        : "unavailable";
+                    const targetStatus = row.day1_status === "unavailable" ? "available" : "unavailable";
                     return (
-                      <button
-                        type="button"
-                        className="button button-secondary"
-                        disabled={isAssigned || actionLoading}
-                        onClick={() => void handleLorryToggle(row.lorry_id, targetStatus)}
-                      >
-                        {isAssigned ? "Assigned" : targetStatus === "available" ? "Set Available" : "Set Unavailable"}
-                      </button>
+                      <div className="action-stack">
+                        <StatusPill value={row.day1_status} />
+                        <button
+                          type="button"
+                          className="button button-secondary"
+                          disabled={row.day1_status === "assigned" || actionLoading}
+                          onClick={() => void handleLorryToggle(row.lorry_id, 1, targetStatus)}
+                        >
+                          {row.day1_status === "assigned"
+                            ? "Assigned"
+                            : targetStatus === "available"
+                              ? "Set Available"
+                              : "Set Unavailable"}
+                        </button>
+                      </div>
+                    );
+                  },
+                },
+                {
+                  key: "day2",
+                  header: "Day 2",
+                  render: (row) => {
+                    const targetStatus = row.day2_status === "unavailable" ? "available" : "unavailable";
+                    return (
+                      <div className="action-stack">
+                        <StatusPill value={row.day2_status} />
+                        <button
+                          type="button"
+                          className="button button-secondary"
+                          disabled={row.day2_status === "assigned" || actionLoading}
+                          onClick={() => void handleLorryToggle(row.lorry_id, 2, targetStatus)}
+                        >
+                          {row.day2_status === "assigned"
+                            ? "Assigned"
+                            : targetStatus === "available"
+                              ? "Set Available"
+                              : "Set Unavailable"}
+                        </button>
+                      </div>
                     );
                   },
                 },

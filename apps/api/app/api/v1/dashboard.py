@@ -4,24 +4,21 @@ Routes:
     GET /api/v1/dashboard/summary   — aggregated dashboard data
 """
 
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 
 from apps.api.app.dependencies.database import get_db
+from apps.api.app.dependencies.business_time import get_planning_dates
 from storage.models import (
     EngineRun,
     M3PlanVersion,
     ManifestSnapshot,
     SKU,
-    Lorry,
-    LorryStateSnapshot,
-    LorryStateItem,
 )
 from integrations.inbound.warehouse_stock_reader import reader as wh_reader
 from integrations.inbound.dc_stock_reader import reader as dc_reader
+from integrations.inbound.lorry_state_reader import reader as lorry_reader
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 
@@ -75,25 +72,27 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         }
 
     # ── Fleet status ────────────────────────────────────────────────────
-    latest_lorry_snap = (
-        db.query(LorryStateSnapshot)
-        .order_by(desc(LorryStateSnapshot.snapshot_time))
-        .first()
-    )
-    fleet_status = {"total": 0, "available": 0, "unavailable": 0, "reefer_available": 0, "normal_available": 0}
-    if latest_lorry_snap:
-        items = db.query(LorryStateItem).filter(
-            LorryStateItem.snapshot_id == latest_lorry_snap.id
-        ).all()
-        for item in items:
-            lorry = db.query(Lorry).filter(Lorry.id == item.lorry_id).first()
+    planning_dates = get_planning_dates()
+    fleet_status = {
+        "business_date": planning_dates[0].isoformat(),
+        "total": 0,
+        "available": 0,
+        "unavailable": 0,
+        "assigned": 0,
+    }
+    reefer_available = 0
+    lorry_contract = lorry_reader.get_latest_contract(db)
+    if lorry_contract:
+        fleet_status["business_date"] = lorry_contract["planning_dates"][0]
+        for lorry in lorry_contract["lorries"]:
             fleet_status["total"] += 1
-            if item.status == "available":
+            status = lorry["day1_status"]
+            if status == "available":
                 fleet_status["available"] += 1
-                if lorry and lorry.lorry_type == "reefer":
-                    fleet_status["reefer_available"] += 1
-                elif lorry:
-                    fleet_status["normal_available"] += 1
+                if lorry["lorry_type"] == "reefer":
+                    reefer_available += 1
+            elif status == "assigned":
+                fleet_status["assigned"] += 1
             else:
                 fleet_status["unavailable"] += 1
 
@@ -146,12 +145,12 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
 
     # Reefer pressure check
     reefer_skus = db.query(func.count(SKU.id)).filter(SKU.reefer_required == True).scalar() or 0
-    if reefer_skus > 0 and fleet_status["reefer_available"] < reefer_skus:
+    if reefer_skus > 0 and reefer_available < reefer_skus:
         alerts.append({
             "type": "reefer_pressure",
             "severity": "warning",
             "message": f"{reefer_skus} reefer SKUs need dispatch but only "
-                       f"{fleet_status['reefer_available']} reefer lorries are available.",
+                       f"{reefer_available} reefer lorries are available tomorrow.",
         })
 
     return {
