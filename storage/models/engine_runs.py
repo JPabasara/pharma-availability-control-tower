@@ -1,4 +1,7 @@
-"""Engine run storage: runs, M1 results, M2 requests, M3 plan versions/stops/items."""
+"""Engine run storage: runs, M1 results, M2 requests, M3 plan versions/stops/items.
+
+Includes traceability fields for audit, debugging, and rollout comparison.
+"""
 
 from datetime import datetime
 from typing import Optional
@@ -42,6 +45,22 @@ class EngineRun(Base, IdMixin, TimestampMixin):
         comment="JSON map of snapshot type -> snapshot id used as input"
     )
 
+    # ── Traceability fields ──────────────────────────────────────────
+    engine_mode: Mapped[Optional[str]] = mapped_column(
+        String(10), nullable=True, comment="stub or real"
+    )
+    engine_impl: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True,
+        comment="Implementation label: stub, m2_xgboost_v1, m3_ortools_v1, etc."
+    )
+    engine_version: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, comment="Model/build version string"
+    )
+    engine_trace: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True,
+        comment="JSON metadata about feature generation / solver execution"
+    )
+
     __table_args__ = (
         Index("ix_engine_run_type", "engine_type"),
         Index("ix_engine_run_status", "status"),
@@ -68,6 +87,14 @@ class M1Result(Base, IdMixin, TimestampMixin):
         String(20), nullable=False, comment="critical, high, medium, low"
     )
     reefer_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # ── Traceability fields ──────────────────────────────────────────
+    score_breakdown: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Human-readable score component breakdown"
+    )
+    raw_features: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True, comment="JSON snapshot of derived M1 features used at run time"
+    )
 
     __table_args__ = (
         Index("ix_m1_result_run", "engine_run_id"),
@@ -98,6 +125,29 @@ class M2Request(Base, IdMixin, TimestampMixin):
         DateTime(timezone=True), nullable=False
     )
 
+    # ── Traceability fields ──────────────────────────────────────────
+    urgency_score: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True, comment="Raw urgency score from real M2 model (0-100)"
+    )
+    shortage_probability: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True, comment="Probability of shortage from classifier (0-1)"
+    )
+    hours_until_shortage: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True, comment="Predicted hours until shortage (0-48)"
+    )
+    effective_stock_at_run: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True, comment="Effective stock at time of inference"
+    )
+    projected_48h_sales: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True, comment="Projected 48h sales used in inference"
+    )
+    safety_stock: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True, comment="Safety stock level used in inference"
+    )
+    raw_features: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True, comment="JSON snapshot of all M2 features used at run time"
+    )
+
     __table_args__ = (
         Index("ix_m2_req_run", "engine_run_id"),
         Index("ix_m2_req_dc", "dc_id"),
@@ -125,6 +175,21 @@ class M3PlanVersion(Base, IdMixin, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
     approved_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # ── Traceability fields ──────────────────────────────────────────
+    plan_name: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, comment="Human-readable plan variant name"
+    )
+    generation_strategy: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True,
+        comment="urgency_max, balanced, cost_aware"
+    )
+    objective_value: Mapped[Optional[float]] = mapped_column(
+        Float, nullable=True, comment="Solver objective function value"
+    )
+    solver_trace: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True, comment="JSON summary of solver execution"
+    )
 
     runs = relationship("M3PlanRun", back_populates="plan_version", cascade="all, delete-orphan")
 
