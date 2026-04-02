@@ -4,8 +4,7 @@ services:
     runtime: python
     plan: free
     region: singapore
-    buildCommand: pip install -r requirements.txt
-    preDeployCommand: alembic upgrade head
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
     startCommand: python -m uvicorn apps.api.app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /
     autoDeployTrigger: checksPass
@@ -23,9 +22,7 @@ services:
         - verify_routes.py
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: pharma-control-tower-db
-          property: connectionString
+        sync: false
       - key: ENGINE_MODE
         value: stub
       - key: BUSINESS_TIMEZONE
@@ -35,7 +32,4 @@ services:
       - key: ALLOW_ORIGIN_REGEX
         sync: false
 
-databases:
-  - name: pharma-control-tower-db
-    plan: free
-    region: singapore
+
