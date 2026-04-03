@@ -36,7 +36,7 @@ The planner is the only end user in the current version.
 - maximum 2 DC stops per run
 - one lorry can be assigned once on Day 1 and once on Day 2
 - local MySQL 8 as the default persistence layer
-- contract-compatible stub engines still supported until real `M1`, `M2`, and `M3` are plugged in
+- contract-compatible stub engines still supported until real `M1`, `M2`, and `M3` are plugged  in
 
 ## Core Rules
 
