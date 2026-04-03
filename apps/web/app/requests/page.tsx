@@ -3,9 +3,8 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
-import { getM2Requests } from "@/lib/api";
-import { buildQueryString, formatDateTime, formatInteger } from "@/lib/format";
-import { usePlannerRunContext, useResolvedRunId } from "@/lib/run-context";
+import { ApiError, getCurrentM2Requests, refreshM2 } from "@/lib/api";
+import { formatDate, formatDateTime, formatInteger } from "@/lib/format";
 import type { M2RequestsResponse } from "@/lib/types";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
@@ -15,61 +14,64 @@ import { PageHeader } from "@/components/PageHeader";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 
+type Notice = { tone: "success" | "error"; message: string };
+
 function RequestsPageContent() {
-  const { runContext } = usePlannerRunContext();
-  const { runId, loading: runLoading, error: runError } = useResolvedRunId("m2");
   const [data, setData] = useState<M2RequestsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+
+  async function loadCurrent() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getCurrentM2Requests();
+      setData(response);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to load M2 requests.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let ignore = false;
+    void loadCurrent();
+  }, []);
 
-    async function load(activeRunId: number) {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await getM2Requests(activeRunId);
-        if (!ignore) {
-          setData(response);
-        }
-      } catch (cause) {
-        if (!ignore) {
-          setError(cause instanceof Error ? cause.message : "Unable to load M2 requests.");
-        }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
+  async function handleRefresh() {
+    setActionLoading(true);
+    setNotice(null);
+    try {
+      await refreshM2();
+      await loadCurrent();
+      setNotice({ tone: "success", message: "M2 was refreshed successfully." });
+    } catch (cause) {
+      const message =
+        cause instanceof ApiError
+          ? cause.message
+          : cause instanceof Error
+            ? cause.message
+            : "Unable to refresh M2.";
+      setNotice({ tone: "error", message });
+    } finally {
+      setActionLoading(false);
     }
-
-    if (runId) {
-      void load(runId);
-    } else {
-      setData(null);
-    }
-
-    return () => {
-      ignore = true;
-    };
-  }, [runId]);
+  }
 
   const totalRequestedUnits = useMemo(
     () => data?.requests.reduce((sum, request) => sum + request.requested_quantity, 0) ?? 0,
     [data]
   );
-
   const criticalCount = useMemo(
     () => data?.requests.filter((request) => request.urgency === "critical").length ?? 0,
     [data]
   );
-
   const impactedDcs = useMemo(
     () => new Set(data?.requests.map((request) => request.dc_id) ?? []).size,
     [data]
   );
-
   const urgencyGroups = useMemo(() => {
     const groups = new Map<string, number>();
     (data?.requests ?? []).forEach((request) => {
@@ -85,42 +87,55 @@ function RequestsPageContent() {
         description="Generated DC replenishment requests, urgency bands, and required-by timing."
         actions={
           <div className="page-actions">
-            <Link
-              href={`/dispatch${buildQueryString(runContext)}`}
-              className="button button-secondary"
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={() => void handleRefresh()}
+              disabled={loading || actionLoading}
             >
+              {actionLoading ? "..." : "Refresh M2"}
+            </button>
+            <Link href="/dispatch" className="button button-secondary">
               Back to Dispatch
             </Link>
           </div>
         }
       />
 
-      {runLoading || loading ? <LoadingPanel label="Loading M2 requests..." /> : null}
-      {runError ? <div className="notice notice-error"><p>{runError}</p></div> : null}
+      {loading ? <LoadingPanel label="Loading M2 requests..." /> : null}
       {error ? <div className="notice notice-error"><p>{error}</p></div> : null}
+      {notice ? (
+        <div className={`notice notice-${notice.tone}`}>
+          <p>{notice.message}</p>
+        </div>
+      ) : null}
 
-      {!runLoading && !runId ? (
+      {!loading && !data?.available ? (
         <EmptyState
-          title="No active M2 run found"
-          description="Generate a plan from Dispatch to create replenishment requests for the DC network."
+          title="No live M2 snapshot yet"
+          description="Use Refresh M2 to regenerate the latest singleton replenishment requests for the DC network."
           actionHref="/dispatch"
           actionLabel="Open Dispatch"
         />
       ) : null}
 
-      {data ? (
+      {data?.available ? (
         <>
           <div className="metric-grid">
             <MetricCard
-              label="Active Run"
-              value={`#${data.run_id}`}
-              detail="Resolved using the planner run-context priority order."
+              label="Last Refreshed"
+              value={data.generated_at ? formatDateTime(data.generated_at) : "Not yet"}
+              detail={
+                data.planning_start_date
+                  ? `Planning Day 1 starts on ${formatDate(data.planning_start_date)}.`
+                  : "Current singleton M2 snapshot."
+              }
               accent="ink"
             />
             <MetricCard
               label="Requests"
               value={formatInteger(data.total_requests)}
-              detail={`${formatInteger(impactedDcs)} DCs are represented in this run.`}
+              detail={`${formatInteger(impactedDcs)} DCs are represented in this snapshot.`}
               accent="teal"
             />
             <MetricCard
@@ -132,7 +147,7 @@ function RequestsPageContent() {
             <MetricCard
               label="Requested Units"
               value={formatInteger(totalRequestedUnits)}
-              detail="Total requested quantity across all generated replenishment lines."
+              detail="Total requested quantity across the latest M2 snapshot."
               accent="amber"
             />
           </div>
@@ -155,7 +170,7 @@ function RequestsPageContent() {
 
           <SectionCard
             title="Request Lines"
-            description="All replenishment requests produced by M2 for the active run."
+            description="All replenishment requests produced by the latest M2 snapshot."
           >
             <DataTable
               columns={[

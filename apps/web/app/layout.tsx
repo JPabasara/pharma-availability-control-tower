@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 
 import { AppShell } from "@/components/AppShell";
-import { RunContextProvider } from "@/lib/run-context";
 import { ThemeProvider } from "@/lib/theme-context";
 
 import "./globals.css";
@@ -38,9 +37,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${headingFont.variable} ${bodyFont.variable}`} suppressHydrationWarning>
         <ThemeProvider>
-          <RunContextProvider>
-            <AppShell>{children}</AppShell>
-          </RunContextProvider>
+          <AppShell>{children}</AppShell>
         </ThemeProvider>
       </body>
     </html>

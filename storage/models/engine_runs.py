@@ -3,11 +3,12 @@
 Includes traceability fields for audit, debugging, and rollout comparison.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -40,6 +41,11 @@ class EngineRun(Base, IdMixin, TimestampMixin):
         String(20), nullable=False, default="running",
         comment="running, completed, failed"
     )
+    planning_start_date: Mapped[Optional[date]] = mapped_column(
+        Date,
+        nullable=True,
+        comment="Day 1 of the 48-hour planning horizon for this execution",
+    )
     input_snapshot_ids: Mapped[Optional[dict]] = mapped_column(
         JSON, nullable=True,
         comment="JSON map of snapshot type -> snapshot id used as input"
@@ -65,6 +71,7 @@ class EngineRun(Base, IdMixin, TimestampMixin):
         Index("ix_engine_run_type", "engine_type"),
         Index("ix_engine_run_status", "status"),
         Index("ix_engine_run_started", "started_at"),
+        Index("ix_engine_run_planning_start", "planning_start_date"),
     )
 
 
@@ -95,6 +102,8 @@ class M1Result(Base, IdMixin, TimestampMixin):
     raw_features: Mapped[Optional[dict]] = mapped_column(
         JSON, nullable=True, comment="JSON snapshot of derived M1 features used at run time"
     )
+
+    sku: Mapped["SKU"] = relationship("SKU")
 
     __table_args__ = (
         Index("ix_m1_result_run", "engine_run_id"),
@@ -148,6 +157,9 @@ class M2Request(Base, IdMixin, TimestampMixin):
         JSON, nullable=True, comment="JSON snapshot of all M2 features used at run time"
     )
 
+    dc: Mapped["DC"] = relationship("DC")
+    sku: Mapped["SKU"] = relationship("SKU")
+
     __table_args__ = (
         Index("ix_m2_req_run", "engine_run_id"),
         Index("ix_m2_req_dc", "dc_id"),
@@ -191,6 +203,7 @@ class M3PlanVersion(Base, IdMixin, TimestampMixin):
         JSON, nullable=True, comment="JSON summary of solver execution"
     )
 
+    engine_run: Mapped["EngineRun"] = relationship("EngineRun")
     runs = relationship("M3PlanRun", back_populates="plan_version", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -223,6 +236,7 @@ class M3PlanRun(Base, IdMixin, TimestampMixin):
     )
 
     plan_version = relationship("M3PlanVersion", back_populates="runs")
+    lorry: Mapped["Lorry"] = relationship("Lorry")
     stops = relationship("M3PlanStop", back_populates="run", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -249,6 +263,7 @@ class M3PlanStop(Base, IdMixin, TimestampMixin):
     )
 
     run = relationship("M3PlanRun", back_populates="stops")
+    dc: Mapped["DC"] = relationship("DC")
     items = relationship("M3PlanItem", back_populates="stop", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -279,6 +294,7 @@ class M3PlanItem(Base, IdMixin, TimestampMixin):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
 
     stop = relationship("M3PlanStop", back_populates="items")
+    sku: Mapped["SKU"] = relationship("SKU")
 
     __table_args__ = (
         Index("ix_m3_item_stop", "plan_stop_id"),

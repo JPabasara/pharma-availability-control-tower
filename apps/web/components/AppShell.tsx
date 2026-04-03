@@ -1,54 +1,69 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { 
-  Activity, 
-  BarChart3, 
-  ClipboardList, 
-  Clock, 
-  Database, 
-  FileText, 
-  LayoutDashboard, 
+import {
+  Activity,
+  ClipboardList,
+  Clock,
+  Database,
+  FileText,
+  LayoutDashboard,
   Menu,
-  Moon, 
+  Moon,
   Sun,
   Truck,
-  X
+  X,
 } from "lucide-react";
 
-import { buildQueryString } from "@/lib/format";
-import { usePlannerRunContext } from "@/lib/run-context";
 import { useTheme } from "@/lib/theme-context";
-
 import { AlertCircle } from "lucide-react";
 
 type NavItem = {
   href: string;
   label: string;
   icon: any;
-  useRunContext?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inputs", label: "Inputs", icon: Database },
-  { href: "/priorities", label: "M1 Priorities", useRunContext: true, icon: AlertCircle },
-  { href: "/requests", label: "M2 Requests", useRunContext: true, icon: ClipboardList },
-  { href: "/dispatch", label: "M3 Dispatch", useRunContext: true, icon: Truck },
+  { href: "/priorities", label: "M1 Priorities", icon: AlertCircle },
+  { href: "/requests", label: "M2 Requests", icon: ClipboardList },
+  { href: "/dispatch", label: "M3 Dispatch", icon: Truck },
   { href: "/history", label: "History", icon: Clock },
   { href: "/demo-state", label: "Demo Operations", icon: Activity },
   { href: "/reports", label: "Reports", icon: FileText },
 ];
 
+const LEGACY_RUN_PARAMS = ["m1RunId", "m2RunId", "m3RunId"] as const;
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { runContext } = usePlannerRunContext();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  
+
   const [time, setTime] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    let changed = false;
+    for (const key of LEGACY_RUN_PARAMS) {
+      if (params.has(key)) {
+        params.delete(key);
+        changed = true;
+      }
+    }
+    if (changed) {
+      const nextQuery = params.toString();
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+    }
+  }, [pathname, router]);
 
   useEffect(() => {
     setTime(new Date().toLocaleTimeString());
@@ -58,14 +73,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => clearInterval(timer);
   }, []);
 
-  // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
   return (
     <div className="shell">
-      {/* Mobile backdrop overlay */}
       <div
         className={`sidebar-overlay${isMobileMenuOpen ? " active" : ""}`}
         onClick={() => setIsMobileMenuOpen(false)}
@@ -81,7 +94,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="sidebar-eyebrow">Planner Console</span>
             <h1>Pharma Tower</h1>
           </div>
-          {/* Close button — visible only on mobile */}
           <button
             className="mobile-close"
             onClick={() => setIsMobileMenuOpen(false)}
@@ -95,21 +107,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav className="nav-list" aria-label="Primary navigation">
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.href;
-            const href = item.useRunContext
-              ? `${item.href}${buildQueryString(runContext)}`
-              : item.href;
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
-                href={href}
+                href={item.href}
                 className={`nav-link${active ? " nav-link-active" : ""}`}
               >
                 <Icon size={18} />
                 <span className="nav-link-label">{item.label}</span>
-                {item.useRunContext && runContext?.m3RunId ? (
-                  <span className="nav-link-meta">M3 Linked</span>
-                ) : null}
               </Link>
             );
           })}
@@ -123,7 +129,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="main-wrapper">
         <header className="top-header">
-          {/* Hamburger — visible only on mobile */}
           <button
             className="mobile-toggle"
             onClick={() => setIsMobileMenuOpen(true)}
@@ -140,8 +145,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="live-dot" />
             SYSTEM ONLINE
           </div>
-          <button 
-            className="theme-toggle" 
+          <button
+            className="theme-toggle"
             onClick={toggleTheme}
             aria-label="Toggle theme"
           >

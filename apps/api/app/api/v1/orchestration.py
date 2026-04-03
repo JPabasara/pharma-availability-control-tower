@@ -85,6 +85,7 @@ def list_engine_runs(
                 "engine_type": r.engine_type,
                 "started_at": r.started_at.isoformat() if r.started_at else None,
                 "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                "planning_start_date": r.planning_start_date.isoformat() if r.planning_start_date else None,
                 "status": r.status,
                 "input_snapshot_ids": r.input_snapshot_ids,
             }
@@ -106,6 +107,7 @@ def get_engine_run(run_id: int, db: Session = Depends(get_db)):
         "engine_type": run.engine_type,
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "planning_start_date": run.planning_start_date.isoformat() if run.planning_start_date else None,
         "status": run.status,
         "input_snapshot_ids": run.input_snapshot_ids,
     }

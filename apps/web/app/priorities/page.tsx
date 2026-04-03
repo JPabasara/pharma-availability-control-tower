@@ -3,9 +3,8 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
-import { getM1Results } from "@/lib/api";
-import { buildQueryString, formatInteger, formatNumber } from "@/lib/format";
-import { usePlannerRunContext, useResolvedRunId } from "@/lib/run-context";
+import { ApiError, getCurrentM1Results, refreshM1 } from "@/lib/api";
+import { formatDate, formatDateTime, formatInteger, formatNumber } from "@/lib/format";
 import type { M1ResultsResponse } from "@/lib/types";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
@@ -15,60 +14,61 @@ import { PageHeader } from "@/components/PageHeader";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 
+type Notice = { tone: "success" | "error"; message: string };
+
 function PrioritiesPageContent() {
-  const { runContext } = usePlannerRunContext();
-  const { runId, loading: runLoading, error: runError } = useResolvedRunId("m1");
   const [data, setData] = useState<M1ResultsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+
+  async function loadCurrent() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getCurrentM1Results();
+      setData(response);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to load M1 results.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let ignore = false;
+    void loadCurrent();
+  }, []);
 
-    async function load(activeRunId: number) {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await getM1Results(activeRunId);
-        if (!ignore) {
-          setData(response);
-        }
-      } catch (cause) {
-        if (!ignore) {
-          setError(cause instanceof Error ? cause.message : "Unable to load M1 results.");
-        }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
+  async function handleRefresh() {
+    setActionLoading(true);
+    setNotice(null);
+    try {
+      await refreshM1();
+      await loadCurrent();
+      setNotice({ tone: "success", message: "M2 and M1 were refreshed successfully." });
+    } catch (cause) {
+      const message =
+        cause instanceof ApiError
+          ? cause.message
+          : cause instanceof Error
+            ? cause.message
+            : "Unable to refresh M1.";
+      setNotice({ tone: "error", message });
+    } finally {
+      setActionLoading(false);
     }
-
-    if (runId) {
-      void load(runId);
-    } else {
-      setData(null);
-    }
-
-    return () => {
-      ignore = true;
-    };
-  }, [runId]);
+  }
 
   const criticalLines = useMemo(
     () => data?.line_results.filter((line) => line.priority_band === "critical").length ?? 0,
     [data]
   );
-
   const reeferLines = useMemo(
     () => data?.line_results.filter((line) => line.reefer_required).length ?? 0,
     [data]
   );
-
-  const topScore = useMemo(
-    () => data?.line_results[0]?.priority_score ?? 0,
-    [data]
-  );
+  const topScore = useMemo(() => data?.line_results[0]?.priority_score ?? 0, [data]);
 
   return (
     <div className="page-stack">
@@ -77,42 +77,55 @@ function PrioritiesPageContent() {
         description="Shipment-line priority scores and the aggregated SKU view for planner review."
         actions={
           <div className="page-actions">
-            <Link
-              href={`/dispatch${buildQueryString(runContext)}`}
-              className="button button-secondary"
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={() => void handleRefresh()}
+              disabled={loading || actionLoading}
             >
+              {actionLoading ? "..." : "Refresh M1"}
+            </button>
+            <Link href="/dispatch" className="button button-secondary">
               Back to Dispatch
             </Link>
           </div>
         }
       />
 
-      {runLoading || loading ? <LoadingPanel label="Loading M1 priorities..." /> : null}
-      {runError ? <div className="notice notice-error"><p>{runError}</p></div> : null}
+      {loading ? <LoadingPanel label="Loading M1 priorities..." /> : null}
       {error ? <div className="notice notice-error"><p>{error}</p></div> : null}
+      {notice ? (
+        <div className={`notice notice-${notice.tone}`}>
+          <p>{notice.message}</p>
+        </div>
+      ) : null}
 
-      {!runLoading && !runId ? (
+      {!loading && !data?.available ? (
         <EmptyState
-          title="No active M1 run found"
-          description="Generate a plan from Dispatch to create M1 priority results, or let this page resolve the most recent run after one exists."
+          title="No live M1 snapshot yet"
+          description="Use Refresh M1 to regenerate M2 and M1, then review the latest singleton priority results here."
           actionHref="/dispatch"
           actionLabel="Open Dispatch"
         />
       ) : null}
 
-      {data ? (
+      {data?.available ? (
         <>
           <div className="metric-grid">
             <MetricCard
-              label="Active Run"
-              value={`#${data.run_id}`}
-              detail="Resolved from query params, saved run context, or the latest M1 run."
+              label="Last Refreshed"
+              value={data.generated_at ? formatDateTime(data.generated_at) : "Not yet"}
+              detail={
+                data.planning_start_date
+                  ? `Planning Day 1 starts on ${formatDate(data.planning_start_date)}.`
+                  : "Current singleton M1 snapshot."
+              }
               accent="ink"
             />
             <MetricCard
               label="Line Results"
               value={formatInteger(data.total_lines)}
-              detail="Manifest lines scored by the M1 stub."
+              detail="Manifest lines scored by the latest M1 run."
               accent="teal"
             />
             <MetricCard
@@ -124,7 +137,7 @@ function PrioritiesPageContent() {
             <MetricCard
               label="Top Score"
               value={formatNumber(topScore)}
-              detail={`${formatInteger(reeferLines)} reefer-sensitive lines are in this run.`}
+              detail={`${formatInteger(reeferLines)} reefer-sensitive lines are in this snapshot.`}
               accent="amber"
             />
           </div>
@@ -154,7 +167,7 @@ function PrioritiesPageContent() {
 
           <SectionCard
             title="Line-Level Results"
-            description="The planner-facing view of every manifest line scored by M1."
+            description="The planner-facing view of every manifest line scored by the latest M1 snapshot."
           >
             <DataTable
               columns={[
