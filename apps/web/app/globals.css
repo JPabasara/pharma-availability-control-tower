@@ -1231,6 +1231,114 @@ textarea {
   }
 }
 
+/* ─── Plan Archive Cards (Reports) ─── */
+.plan-archive-list {
+  display: grid;
+  gap: 0.625rem;
+}
+
+.plan-archive-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  font: inherit;
+  color: var(--color-ink);
+}
+
+.plan-archive-card:hover {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-hover);
+}
+
+.plan-archive-card-selected {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-glow);
+  background: var(--color-primary-subtle);
+}
+
+.plan-archive-card-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.plan-archive-radio {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s ease;
+}
+
+.plan-archive-card-selected .plan-archive-radio {
+  border-color: var(--color-primary);
+}
+
+.plan-archive-dot {
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: var(--color-primary);
+  transition: all 0.2s ease;
+}
+
+.plan-archive-dot-active {
+  width: 12px;
+  height: 12px;
+}
+
+.plan-archive-info {
+  min-width: 0;
+}
+
+.plan-archive-info h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.plan-archive-info p {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-ink-soft);
+}
+
+.plan-archive-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .plan-archive-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .plan-archive-stats {
+    padding-left: 2.1rem;
+  }
+}
+
 /* ─── Very small phones (≤420px) ─── */
 @media (max-width: 420px) {
   .content {
