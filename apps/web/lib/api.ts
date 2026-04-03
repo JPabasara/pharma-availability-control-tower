@@ -192,6 +192,18 @@ export function generatePlan() {
   });
 }
 
+export function refreshM1() {
+  return apiFetch<any>("/api/v1/orchestration/refresh-m1", {
+    method: "POST",
+  });
+}
+
+export function refreshM2() {
+  return apiFetch<any>("/api/v1/orchestration/refresh-m2", {
+    method: "POST",
+  });
+}
+
 export function getM1Results(runId: number) {
   return apiFetch<M1ResultsResponse>(`/api/v1/planner/m1-results/${runId}`);
 }

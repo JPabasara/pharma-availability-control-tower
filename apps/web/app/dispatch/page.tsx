@@ -7,6 +7,8 @@ import {
   ApiError,
   approvePlan,
   generatePlan,
+  refreshM1,
+  refreshM2,
   getDcStock,
   getLorryState,
   getM3PlanDetail,
@@ -256,13 +258,21 @@ function DispatchPageContent() {
   );
   const isDraftSelected = selectedPlan?.plan_status === "draft";
 
-  function syncRunContext(m1RunId: number, m2RunId: number, m3RunId: number, generatedAt: string) {
-    const nextContext = { m1RunId, m2RunId, m3RunId, generatedAt };
+  function updateRunContextPart(updates: Partial<import("@/lib/types").RunContext>) {
+    const nextContext = {
+      m1RunId: null,
+      m2RunId: null,
+      m3RunId: null,
+      generatedAt: null,
+      ...runContext,
+      ...updates,
+    };
     setRunContext(nextContext);
-    const params = new URLSearchParams();
-    params.set("m1RunId", String(m1RunId));
-    params.set("m2RunId", String(m2RunId));
-    params.set("m3RunId", String(m3RunId));
+
+    const params = new URLSearchParams(window.location.search);
+    if (nextContext.m1RunId) params.set("m1RunId", String(nextContext.m1RunId));
+    if (nextContext.m2RunId) params.set("m2RunId", String(nextContext.m2RunId));
+    if (nextContext.m3RunId) params.set("m3RunId", String(nextContext.m3RunId));
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
@@ -351,17 +361,53 @@ function DispatchPageContent() {
     }));
   }
 
+  async function handleRefreshM1() {
+    setActionLoading(true);
+    setNotice(null);
+    try {
+      const response = await refreshM1();
+      updateRunContextPart({ m1RunId: response.m1_run_id, m1GeneratedAt: response.orchestration_time });
+      setNotice({
+        tone: "success",
+        title: "M1 Refreshed",
+        message: `Generated M1 run #${response.m1_run_id}.`,
+      });
+    } catch (cause) {
+      setNotice(parseApiError(cause));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleRefreshM2() {
+    setActionLoading(true);
+    setNotice(null);
+    try {
+      const response = await refreshM2();
+      updateRunContextPart({ m2RunId: response.m2_run_id, m2GeneratedAt: response.orchestration_time });
+      setNotice({
+        tone: "success",
+        title: "M2 Refreshed",
+        message: `Generated M2 run #${response.m2_run_id}.`,
+      });
+    } catch (cause) {
+      setNotice(parseApiError(cause));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleGeneratePlan() {
     setActionLoading(true);
     setNotice(null);
     setValidationWarnings([]);
     try {
       const response = await generatePlan();
-      syncRunContext(response.m1_run_id, response.m2_run_id, response.m3_run_id, response.orchestration_time);
+      updateRunContextPart({ m3RunId: response.m3_run_id, generatedAt: response.orchestration_time });
       setNotice({
         tone: "success",
         title: "Plan generated",
-        message: `Created M1 run #${response.m1_run_id}, M2 run #${response.m2_run_id}, and M3 run #${response.m3_run_id}.`,
+        message: `Created M3 run #${response.m3_run_id}.`,
       });
     } catch (cause) {
       setNotice(parseApiError(cause));
@@ -481,11 +527,27 @@ function DispatchPageContent() {
           <div className="page-actions">
             <button
               type="button"
+              className="button button-secondary"
+              onClick={() => void handleRefreshM1()}
+              disabled={actionLoading}
+            >
+              {actionLoading ? "..." : "Refresh M1"}
+            </button>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => void handleRefreshM2()}
+              disabled={actionLoading}
+            >
+              {actionLoading ? "..." : "Refresh M2"}
+            </button>
+            <button
+              type="button"
               className="button button-primary"
               onClick={() => void handleGeneratePlan()}
               disabled={actionLoading}
             >
-              {actionLoading ? "Working..." : "Generate Plan"}
+              {actionLoading ? "..." : "Generate Plan"}
             </button>
           </div>
         }
@@ -511,10 +573,30 @@ function DispatchPageContent() {
 
       {runContext?.m1RunId || runContext?.m2RunId || runContext?.m3RunId ? (
         <div className="metric-grid">
-          <MetricCard label="M1 Run" value={runContext?.m1RunId ? `#${runContext.m1RunId}` : "None"} detail="Priority results linked into the current planner session." accent="ink" />
-          <MetricCard label="M2 Run" value={runContext?.m2RunId ? `#${runContext.m2RunId}` : "None"} detail="Request generation context preserved across page refreshes." accent="amber" />
-          <MetricCard label="M3 Run" value={runContext?.m3RunId ? `#${runContext.m3RunId}` : "None"} detail="Candidate plan set currently active in Dispatch." accent="teal" />
-          <MetricCard label="Generated At" value={runContext?.generatedAt ? formatDateTime(runContext.generatedAt) : "Not yet"} detail="Stored in local run context after Generate Plan." accent="rose" />
+          <MetricCard 
+            label="M1 Run" 
+            value={runContext?.m1RunId ? `#${runContext.m1RunId}` : "None"} 
+            detail={runContext?.m1GeneratedAt ? `Updated ${formatDateTime(runContext.m1GeneratedAt)}` : "Priority results linked into the current planner session."} 
+            accent="ink" 
+          />
+          <MetricCard 
+            label="M2 Run" 
+            value={runContext?.m2RunId ? `#${runContext.m2RunId}` : "None"} 
+            detail={runContext?.m2GeneratedAt ? `Updated ${formatDateTime(runContext.m2GeneratedAt)}` : "Request generation context preserved across page refreshes."} 
+            accent="amber" 
+          />
+          <MetricCard 
+            label="M3 Run" 
+            value={runContext?.m3RunId ? `#${runContext.m3RunId}` : "None"} 
+            detail="Candidate plan set currently active in Dispatch." 
+            accent="teal" 
+          />
+          <MetricCard 
+            label="M3 Generated" 
+            value={runContext?.generatedAt ? formatDateTime(runContext.generatedAt).split(" ")[1] ?? "Time" : "Not yet"} 
+            detail={runContext?.generatedAt ? formatDateTime(runContext.generatedAt).split(" ")[0] ?? "Date" : "Stored in local run context after Generate Plan."} 
+            accent="rose" 
+          />
         </div>
       ) : null}
 

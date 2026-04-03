@@ -5,6 +5,8 @@ export type RunContext = {
   m2RunId: number | null;
   m3RunId: number | null;
   generatedAt: string | null;
+  m1GeneratedAt?: string | null;
+  m2GeneratedAt?: string | null;
 };
 
 export type DashboardAlert = {
@@ -320,11 +322,7 @@ export type GeneratePlanResponse = {
   success: boolean;
   message: string;
   orchestration_time: string;
-  m2_run_id: number;
-  m1_run_id: number;
   m3_run_id: number;
-  m2_requests_count: number;
-  m1_results_count: number;
   m3_plans_count: number;
 };
 

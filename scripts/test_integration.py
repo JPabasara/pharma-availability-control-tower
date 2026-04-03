@@ -16,7 +16,7 @@ project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
 from apps.api.app.dependencies.database import SessionLocal
-from apps.api.app.orchestration.service import generate_plan
+from apps.api.app.orchestration.service import refresh_m2, refresh_m1, generate_plan
 from apps.api.app.planner_flow.service import approve_plan, reject_plan
 from demo_state.services import get_reservations, get_transfers, get_stock_summary
 from storage.models import EngineRun, M1Result, M2Request, M3PlanVersion
@@ -32,14 +32,19 @@ def main():
         print("=" * 60)
         print()
 
-        print("[1/5] Running generate_plan()...")
-        result = generate_plan(session)
+        print("[1/5] Running orchestration pipeline...")
+        print("  Running refresh_m2()...")
+        m2_result = refresh_m2(session)
+        print("  Running refresh_m1()...")
+        m1_result = refresh_m1(session)
+        print("  Running generate_plan() (M3)...")
+        m3_result = generate_plan(session)
 
-        print(f"  Orchestration time: {result['orchestration_time']}")
-        print(f"  M2 run ID: {result['m2_run_id']} ({result['m2_requests_count']} requests)")
-        print(f"  M1 run ID: {result['m1_run_id']} ({result['m1_results_count']} results)")
-        print(f"  M3 run ID: {result['m3_run_id']} ({result['m3_plans_count']} plans)")
-        print(f"  Input snapshots: {result['input_snapshot_ids']}")
+        print(f"  Orchestration time: {m3_result['orchestration_time']}")
+        print(f"  M2 run ID: {m2_result['m2_run_id']} ({m2_result['m2_requests_count']} requests)")
+        print(f"  M1 run ID: {m1_result['m1_run_id']} ({m1_result['m1_results_count']} results)")
+        print(f"  M3 run ID: {m3_result['m3_run_id']} ({m3_result['m3_plans_count']} plans)")
+        print(f"  Input snapshots: {m3_result['input_snapshot_ids']}")
         print()
 
         # ── Step 2: Verify DB persistence ──────────────────────────────
@@ -62,26 +67,26 @@ def main():
 
         # ── Step 3: Show M2 requests ───────────────────────────────────
         print("[3/5] M2 Replenishment Requests:")
-        for req in result["m2_requests"][:5]:
-            print(f"  DC {req['dc_code']} SKU {req['sku_code']}: "
+        for req in m2_result["m2_requests"][:5]:
+            print(f"  DC {req['dc_id']} SKU {req['sku_id']}: "
                   f"qty={req['requested_quantity']}, urgency={req['urgency']}")
-        if len(result["m2_requests"]) > 5:
-            print(f"  ... and {len(result['m2_requests']) - 5} more")
+        if len(m2_result["m2_requests"]) > 5:
+            print(f"  ... and {len(m2_result['m2_requests']) - 5} more")
         print()
 
         # ── Step 4: Show M1 results ────────────────────────────────────
         print("[4/5] M1 Priority Results (top 5):")
-        for res in result["m1_results"][:5]:
-            print(f"  SKU {res['sku_code']}: score={res['priority_score']}, "
+        for res in m1_result["m1_results"][:5]:
+            print(f"  SKU {res['sku_id']}: score={res['priority_score']}, "
                   f"band={res['priority_band']}")
         print()
 
         # ── Step 5: Show M3 plans ──────────────────────────────────────
         print("[5/5] M3 Candidate Plans:")
-        for plan in result["m3_plans"]:
-            total = sum(sum(i["quantity"] for i in s["items"]) for s in plan["stops"])
-            print(f"  {plan['plan_name']}: score={plan['score']}, "
-                  f"is_best={plan['is_best']}, stops={len(plan['stops'])}, "
+        for plan in m3_result["m3_plans"]:
+            total = sum(sum(i["quantity"] for i in s["items"]) for s in plan.get("stops", []))
+            print(f"  {plan.get('plan_name', 'Plan')}: score={plan.get('score', 0)}, "
+                  f"is_best={plan.get('is_best', False)}, stops={len(plan.get('stops', []))}, "
                   f"total_loaded={total}")
         print()
 
@@ -93,7 +98,7 @@ def main():
 
         # Find the best plan
         best_plan = None
-        for plan in result["m3_plans"]:
+        for plan in m3_result["m3_plans"]:
             if plan.get("is_best"):
                 best_plan = plan
                 break
@@ -147,7 +152,7 @@ def main():
         print("=" * 60)
         print("TESTING PLANNER FLOW: Reject Non-Best Plan")
         print("=" * 60)
-        for plan in result["m3_plans"]:
+        for plan in m3_result["m3_plans"]:
             if not plan.get("is_best") and "plan_version_id" in plan:
                 pvid = plan["plan_version_id"]
                 reject_result = reject_plan(session, pvid, notes="Testing rejection")
