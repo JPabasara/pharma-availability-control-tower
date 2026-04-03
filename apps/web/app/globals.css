@@ -116,13 +116,14 @@ textarea {
 .shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .main-wrapper {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  overflow-y: auto;
   position: relative;
 }
 
@@ -130,8 +131,9 @@ textarea {
 .sidebar {
   position: sticky;
   top: 0;
+  height: 100vh;
+  overflow-y: auto;
   display: flex;
-  min-height: 100vh;
   flex-direction: column;
   gap: 1.5rem;
   padding: 1.25rem;
@@ -941,30 +943,192 @@ textarea {
   align-items: start;
 }
 
+/* ─── Hamburger & Mobile Close (hidden on desktop) ─── */
+.mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.mobile-toggle:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+.mobile-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--sidebar-text-soft);
+  cursor: pointer;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.mobile-close:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text);
+}
+
+/* ─── Sidebar Backdrop Overlay ─── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+/* ─── Desktop: narrow sidebar at 1024px ─── */
 @media (max-width: 1024px) {
   .shell {
     grid-template-columns: 240px minmax(0, 1fr);
   }
 }
 
+/* ─── Tablet / Mobile ─── */
 @media (max-width: 768px) {
   .shell {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    height: 100vh;
+    overflow: hidden;
   }
-  
+
+  /* Sidebar becomes a slide-in drawer */
   .sidebar {
-    position: static;
-    min-height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--sidebar-border);
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    width: 280px;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    border-right: 1px solid var(--sidebar-border);
+    box-shadow: var(--shadow-hard);
   }
-  
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Overlay shown on mobile */
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Show hamburger & close btn */
+  .mobile-toggle {
+    display: flex;
+  }
+
+  .mobile-close {
+    display: flex;
+  }
+
+  /* Main wrapper scrolls independently */
+  .main-wrapper {
+    width: 100%;
+    overflow-y: auto;
+  }
+
+  /* Header: hamburger on the left */
+  .top-header {
+    justify-content: flex-start;
+    gap: 0.75rem;
+    padding: 0 1rem;
+  }
+
+  /* Clock pushed to the right */
+  .live-clock {
+    margin-right: auto;
+  }
+
+  /* Content padding reduced */
+  .content {
+    padding: 1rem;
+  }
+
+  /* All multi-column grids collapse to 1 col */
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .two-up-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .three-up-grid {
+    grid-template-columns: 1fr;
+  }
+
   .split-layout {
     grid-template-columns: 1fr;
   }
 
   .item-row {
     grid-template-columns: 1fr;
+  }
+
+  /* Tables scroll horizontally */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Page header stacks */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  /* Button rows wrap */
+  .page-actions,
+  .section-card-actions,
+  .action-row,
+  .toolbar,
+  .button-row {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+/* ─── Very small phones (≤420px) ─── */
+@media (max-width: 420px) {
+  .content {
+    padding: 0.75rem;
+  }
+
+  .live-indicator {
+    display: none;
+  }
+
+  .metric-value {
+    font-size: 2rem;
   }
 }
