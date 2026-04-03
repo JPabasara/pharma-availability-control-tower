@@ -44,6 +44,8 @@ function sanitizeRunContext(value: unknown): RunContext | null {
     m2RunId: typeof source.m2RunId === "number" ? source.m2RunId : null,
     m3RunId: typeof source.m3RunId === "number" ? source.m3RunId : null,
     generatedAt: typeof source.generatedAt === "string" ? source.generatedAt : null,
+    m1GeneratedAt: typeof source.m1GeneratedAt === "string" ? source.m1GeneratedAt : null,
+    m2GeneratedAt: typeof source.m2GeneratedAt === "string" ? source.m2GeneratedAt : null,
   };
 }
 
@@ -86,7 +88,9 @@ function sameContext(left: RunContext | null, right: RunContext | null) {
     left.m1RunId === right.m1RunId &&
     left.m2RunId === right.m2RunId &&
     left.m3RunId === right.m3RunId &&
-    left.generatedAt === right.generatedAt
+    left.generatedAt === right.generatedAt &&
+    left.m1GeneratedAt === right.m1GeneratedAt &&
+    left.m2GeneratedAt === right.m2GeneratedAt
   );
 }
 

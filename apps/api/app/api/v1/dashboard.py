@@ -35,12 +35,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         - fleet_status: lorry availability overview
     """
 
-    # ── Pending approvals ───────────────────────────────────────────────
-    pending_count = (
-        db.query(func.count(M3PlanVersion.id))
-        .filter(M3PlanVersion.plan_status == "draft")
-        .scalar() or 0
-    )
+    # ── Approvals Tracking ───────────────────────────────────────────────
 
     approved_count = (
         db.query(func.count(M3PlanVersion.id))
@@ -154,7 +149,6 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         })
 
     return {
-        "pending_approvals": pending_count,
         "approved_plans": approved_count,
         "active_manifests": active_manifests,
         "latest_engine_run": latest_run_info,
