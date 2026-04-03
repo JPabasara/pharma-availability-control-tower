@@ -73,7 +73,7 @@ function PrioritiesPageContent() {
   return (
     <div className="page-stack">
       <PageHeader
-        title="M1 Priorities"
+        title="Prioritizer"
         description="Shipment-line priority scores and the aggregated SKU view for planner review."
         actions={
           <div className="page-actions">
@@ -103,7 +103,7 @@ function PrioritiesPageContent() {
       {!loading && !data?.available ? (
         <EmptyState
           title="No live M1 snapshot yet"
-          description="Use Refresh M1 to regenerate M2 and M1, then review the latest singleton priority results here."
+          description="Use Refresh M1 to regenerate M2 and M1, then review the latest priority results here."
           actionHref="/dispatch"
           actionLabel="Open Dispatch"
         />
@@ -118,7 +118,7 @@ function PrioritiesPageContent() {
               detail={
                 data.planning_start_date
                   ? `Planning Day 1 starts on ${formatDate(data.planning_start_date)}.`
-                  : "Current singleton M1 snapshot."
+                  : "Current Prioritizer snapshot."
               }
               accent="ink"
             />

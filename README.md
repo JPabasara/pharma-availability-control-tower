@@ -12,9 +12,9 @@ This repository contains the current planner-facing control tower for a pharma d
    - lorry state
    - ETA snapshots
 2. **Decision engines**
-   - `M1` for shipment-SKU priority scoring
-   - `M2` for DC request generation from 48-hour forecast need
-   - `M3` for candidate dispatch planning over the next 2 planning days
+   - `M1` (Prioritizer) for shipment-SKU priority scoring
+   - `M2` (Forecaster) for DC request generation from 48-hour forecast need
+   - `M3` (Optimizer) for candidate dispatch planning over the next 2 planning days
 3. **Planner console**
    - dashboard, inputs, priorities, requests, dispatch, history, demo operations, and reports
 4. **Demo operations**
@@ -72,9 +72,9 @@ The frontend is a planner-only console with these views:
 
 - `Dashboard`
 - `Inputs`
-- `M1 Priorities`
-- `M2 Requests`
-- `M3 Dispatch`
+- `Prioritizer`
+- `Forecaster`
+- `Optimizer`
 - `History`
 - `Demo Operations`
 - `Reports`
