@@ -83,7 +83,7 @@ function RequestsPageContent() {
   return (
     <div className="page-stack">
       <PageHeader
-        title="M2 Requests"
+        title="Forecaster"
         description="Generated DC replenishment requests, urgency bands, and required-by timing."
         actions={
           <div className="page-actions">
@@ -113,7 +113,7 @@ function RequestsPageContent() {
       {!loading && !data?.available ? (
         <EmptyState
           title="No live M2 snapshot yet"
-          description="Use Refresh M2 to regenerate the latest singleton replenishment requests for the DC network."
+          description="Use Refresh M2 to regenerate the latest replenishment requests for the DC network."
           actionHref="/dispatch"
           actionLabel="Open Dispatch"
         />
@@ -128,7 +128,7 @@ function RequestsPageContent() {
               detail={
                 data.planning_start_date
                   ? `Planning Day 1 starts on ${formatDate(data.planning_start_date)}.`
-                  : "Current singleton M2 snapshot."
+                  : "Current Forecaster snapshot."
               }
               accent="ink"
             />

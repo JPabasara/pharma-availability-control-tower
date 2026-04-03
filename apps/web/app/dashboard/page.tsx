@@ -60,7 +60,6 @@ export default function DashboardPage() {
     <div className="page-stack">
       <PageHeader
         title="Dashboard"
-        description="Live planner overview for shortages, fleet readiness, and current singleton planning snapshots."
         actions={
           <div className="page-actions">
             <Link href="/dispatch" className="button button-primary">
@@ -88,27 +87,27 @@ export default function DashboardPage() {
         <>
           <div className="metric-grid">
             <MetricCard
-              label="M1 Snapshot"
+              label="Prioritizer"
               value={
                 summary.live_snapshots.m1.generated_at
                   ? formatDateTime(summary.live_snapshots.m1.generated_at)
                   : "Not yet"
               }
-              detail="Latest singleton M1 priority refresh."
+              detail="Latest priority refresh."
               accent="ink"
             />
             <MetricCard
-              label="M2 Snapshot"
+              label="Forecaster"
               value={
                 summary.live_snapshots.m2.generated_at
                   ? formatDateTime(summary.live_snapshots.m2.generated_at)
                   : "Not yet"
               }
-              detail="Latest singleton M2 replenishment refresh."
+              detail="Latest replenishment refresh."
               accent="amber"
             />
             <MetricCard
-              label="M3 Snapshot"
+              label="Optimizer"
               value={
                 summary.live_snapshots.m3.generated_at
                   ? formatDateTime(summary.live_snapshots.m3.generated_at)
@@ -118,7 +117,7 @@ export default function DashboardPage() {
               accent="teal"
             />
             <MetricCard
-              label="M3 Status"
+              label="Optimizer Status"
               value={summary.m3_lock.locked ? "Locked" : "Open"}
               detail={
                 summary.m3_lock.locked
@@ -132,31 +131,30 @@ export default function DashboardPage() {
           <div className="two-up-grid">
             <SectionCard
               title="Live Planning Workspace"
-              description="Current snapshot visibility across the singleton planner flow."
             >
               <div className="stack-list">
                 <div className="list-card">
-                  <h4>M1 Priorities</h4>
+                  <h4>Prioritizer</h4>
                   <p>
                     {summary.live_snapshots.m1.available
                       ? `Updated ${formatDateTime(summary.live_snapshots.m1.generated_at)}.`
-                      : "No live M1 snapshot yet."}
+                      : "No live Prioritizer snapshot yet."}
                   </p>
                 </div>
                 <div className="list-card">
-                  <h4>M2 Requests</h4>
+                  <h4>Forecaster</h4>
                   <p>
                     {summary.live_snapshots.m2.available
                       ? `Updated ${formatDateTime(summary.live_snapshots.m2.generated_at)}.`
-                      : "No live M2 snapshot yet."}
+                      : "No live Forecaster snapshot yet."}
                   </p>
                 </div>
                 <div className="list-card">
-                  <h4>M3 Dispatch</h4>
+                  <h4>Optimizer</h4>
                   <p>
                     {summary.live_snapshots.m3.available
                       ? `Updated ${formatDateTime(summary.live_snapshots.m3.generated_at)}.`
-                      : "No live M3 candidate set yet."}
+                      : "No live Optimizer candidate set yet."}
                   </p>
                   <div className="detail-list">
                     <span className="detail-chip">Approved plans {formatInteger(summary.approved_plans)}</span>
@@ -224,7 +222,6 @@ export default function DashboardPage() {
 
           <SectionCard
             title="Planner Alerts"
-            description="Critical DC shortages, warehouse pressure, and reefer constraints surfaced by the backend."
           >
             {summary.alerts.length ? (
               <div className="alert-list">

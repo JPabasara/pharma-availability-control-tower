@@ -58,6 +58,8 @@ def upload_manifest(
         session.add(vessel)
         session.flush()
         
+        vessel_id = vessel.id
+        
         # Immediately generate an initial mock ETA so it is trackable
         from integrations.inbound.eta_provider import provider
         provider.refresh_eta(session, vessel.id, auto_commit=False)

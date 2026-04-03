@@ -412,8 +412,8 @@ function DispatchPageContent() {
   return (
     <div className="page-stack">
       <PageHeader
-        title="M3 Dispatch"
-        description="Generate the live singleton plan set, compare candidate dispatches, edit overrides, and approve the final two-day lorry schedule."
+        title="Optimizer"
+        description="Generate the live plan set, compare candidate dispatches, edit overrides, and approve the final two-day lorry schedule."
         actions={
           <div className="page-actions">
             <button type="button" className="button button-primary" onClick={() => void handleGeneratePlan()} disabled={actionLoading || m3Locked}>
@@ -441,22 +441,22 @@ function DispatchPageContent() {
       ) : null}
 
       <div className="metric-grid">
-        <MetricCard label="M1 Updated" value={m1GeneratedAt ? formatDateTime(m1GeneratedAt) : "Not yet"} detail="Latest singleton priority snapshot." accent="ink" />
-        <MetricCard label="M2 Updated" value={m2GeneratedAt ? formatDateTime(m2GeneratedAt) : "Not yet"} detail="Latest singleton replenishment snapshot." accent="amber" />
-        <MetricCard label="M3 Updated" value={m3GeneratedAt ? formatDateTime(m3GeneratedAt) : "Not yet"} detail={planningStartDate ? `Current Day 1 starts on ${formatDate(planningStartDate)}.` : "No live dispatch generation yet."} accent="teal" />
-        <MetricCard label="M3 Status" value={m3Locked ? "Locked" : "Open"} detail={m3Locked ? m3LockReason ?? "Current horizon is already approved." : "Generate Plan refreshes M2, M1, and M3 together."} accent="rose" />
+        <MetricCard label="Prioritizer Updated" value={m1GeneratedAt ? formatDateTime(m1GeneratedAt) : "Not yet"} detail="Latest priority snapshot." accent="ink" />
+        <MetricCard label="Forecaster Updated" value={m2GeneratedAt ? formatDateTime(m2GeneratedAt) : "Not yet"} detail="Latest replenishment snapshot." accent="amber" />
+        <MetricCard label="Optimizer Updated" value={m3GeneratedAt ? formatDateTime(m3GeneratedAt) : "Not yet"} detail={planningStartDate ? `Current Day 1 starts on ${formatDate(planningStartDate)}.` : "No live dispatch generation yet."} accent="teal" />
+        <MetricCard label="Optimizer Status" value={m3Locked ? "Locked" : "Open"} detail={m3Locked ? m3LockReason ?? "Current horizon is already approved." : "Generate Plan refreshes Forecaster, Prioritizer, and Optimizer together."} accent="rose" />
       </div>
 
       {!loadingWorkspace && !plans.length ? (
         <EmptyState
           title={m3Locked ? "Dispatch locked for the current horizon" : "No live dispatch candidates yet"}
-          description={m3Locked ? m3LockReason ?? "Generate Plan will unlock automatically on the next business day." : "Generate Plan refreshes M2, M1, and M3, then replaces the live candidate set with the latest singleton draft plans."}
+          description={m3Locked ? m3LockReason ?? "Generate Plan will unlock automatically on the next business day." : "Generate Plan refreshes Forecaster, Prioritizer, and Optimizer, then replaces the live candidate set with the latest draft plans."}
         />
       ) : null}
 
       {plans.length ? (
         <div className="split-layout">
-          <SectionCard title="Candidate Plans" description="Compare the current singleton draft candidates before selecting one.">
+          <SectionCard title="Candidate Plans" description="Compare the current draft candidates before selecting one.">
             <div className="plan-list">
               {plans.map((plan) => (
                 <button key={plan.id} type="button" className={`plan-card${plan.id === selectedPlanId ? " plan-card-active" : ""}`} onClick={() => setSelectedPlanId(plan.id)}>

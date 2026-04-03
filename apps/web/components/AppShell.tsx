@@ -29,9 +29,9 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inputs", label: "Inputs", icon: Database },
-  { href: "/priorities", label: "M1 Priorities", icon: AlertCircle },
-  { href: "/requests", label: "M2 Requests", icon: ClipboardList },
-  { href: "/dispatch", label: "M3 Dispatch", icon: Truck },
+  { href: "/requests", label: "Forecaster", icon: ClipboardList },
+  { href: "/priorities", label: "Prioritizer", icon: AlertCircle },
+  { href: "/dispatch", label: "Optimizer", icon: Truck },
   { href: "/history", label: "History", icon: Clock },
   { href: "/demo-state", label: "Demo Operations", icon: Activity },
   { href: "/reports", label: "Reports", icon: FileText },
@@ -45,6 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
 
   const [time, setTime] = useState("");
+  const [date, setDate] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -66,10 +67,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname, router]);
 
   useEffect(() => {
-    setTime(new Date().toLocaleTimeString());
-    const timer = setInterval(() => {
-      setTime(new Date().toLocaleTimeString());
-    }, 1000);
+    const updateTime = () => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString());
+      setDate(now.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }));
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -128,7 +132,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="main-wrapper">
-        <header className="top-header">
+        <header className="top-header" style={{ borderTop: "3px solid #3b82f6" }}>
           <button
             className="mobile-toggle"
             onClick={() => setIsMobileMenuOpen(true)}
@@ -137,9 +141,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Menu size={22} />
           </button>
 
-          <div className="live-clock">
-            <Clock size={16} />
-            {time || "--:--:--"}
+          <div className="live-clock" style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+            <span style={{ opacity: 0.8, fontSize: "0.9rem" }}>{date || "---"}</span>
+            <div style={{ display: "flex", gap: "0.3rem", alignItems: "center" }}>
+              <Clock size={16} />
+              {time || "--:--:--"}
+            </div>
           </div>
           <div className="live-indicator">
             <span className="live-dot" />
