@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { getApprovedPlans, getAuditTrail } from "@/lib/api";
+import { getApprovedPlans } from "@/lib/api";
 import { formatDateTime, formatInteger } from "@/lib/format";
-import type { ApprovedPlan, AuditEntry } from "@/lib/types";
+import type { ApprovedPlan } from "@/lib/types";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingPanel } from "@/components/LoadingPanel";
@@ -13,9 +13,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 
+
 export default function HistoryPage() {
   const [plans, setPlans] = useState<ApprovedPlan[]>([]);
-  const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,13 +26,9 @@ export default function HistoryPage() {
       setLoading(true);
       setError(null);
       try {
-        const [approvedPlans, auditTrail] = await Promise.all([
-          getApprovedPlans(),
-          getAuditTrail(100),
-        ]);
+        const approvedPlans = await getApprovedPlans();
         if (!ignore) {
           setPlans(approvedPlans.approved_plans);
-          setAudit(auditTrail.audit_trail);
         }
       } catch (cause) {
         if (!ignore) {
@@ -68,6 +64,17 @@ export default function HistoryPage() {
     [plans]
   );
 
+  const rejectDecisions = useMemo(
+    () =>
+      plans.reduce(
+        (sum, plan) =>
+          sum +
+          plan.decisions.filter((decision) => decision.decision_type === "reject").length,
+        0
+      ),
+    [plans]
+  );
+
   return (
     <div className="page-stack">
       <PageHeader
@@ -98,9 +105,9 @@ export default function HistoryPage() {
           accent="amber"
         />
         <MetricCard
-          label="Audit Entries"
-          value={formatInteger(audit.length)}
-          detail="Recent audit events available from the reporting API."
+          label="Rejected Decisions"
+          value={formatInteger(rejectDecisions)}
+          detail="Rejected decisions preserved in history."
           accent="rose"
         />
       </div>
@@ -133,7 +140,6 @@ export default function HistoryPage() {
                 </div>
 
                 <div className="detail-list">
-                  <span className="detail-chip">Run #{plan.engine_run_id}</span>
                   <span className="detail-chip">Stops {formatInteger(plan.stops.length)}</span>
                   <span className="detail-chip">Score {plan.score ?? 0}</span>
                 </div>
@@ -174,29 +180,6 @@ export default function HistoryPage() {
           </div>
         </SectionCard>
       ) : null}
-
-      <SectionCard
-        title="Audit Trail"
-        description="Recent backend audit events, ordered from newest to oldest."
-      >
-        <DataTable
-          columns={[
-            { key: "entity", header: "Entity", render: (row) => `${row.entity_type} #${row.entity_id}` },
-            { key: "action", header: "Action", render: (row) => <StatusPill value={row.action} /> },
-            { key: "actor", header: "Actor", render: (row) => row.actor },
-            { key: "time", header: "Timestamp", render: (row) => formatDateTime(row.timestamp) },
-            {
-              key: "details",
-              header: "Details",
-              render: (row) => JSON.stringify(row.details ?? {}),
-              className: "mono",
-            },
-          ]}
-          rows={audit}
-          getRowKey={(row) => row.id}
-          emptyText="No audit entries are available yet."
-        />
-      </SectionCard>
     </div>
   );
 }
