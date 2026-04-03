@@ -21,7 +21,7 @@ Completed:
 Completed:
 
 - planner-only Next.js frontend
-- dashboard, inputs, M1 priorities, M2 requests, M3 dispatch, history, demo operations, and reports
+- dashboard, inputs, M1 shipment priority ranking, M2 requests, M3 dispatch, history, demo operations, and reports
 - plan comparison, run-based plan detail, override, approve, reject, and audit trail flows
 - local run-context persistence across the planner workflow
 

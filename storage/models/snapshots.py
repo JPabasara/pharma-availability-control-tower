@@ -42,6 +42,7 @@ class ManifestSnapshot(Base, IdMixin, TimestampMixin):
     )
 
     lines = relationship("ManifestLine", back_populates="snapshot", cascade="all, delete-orphan")
+    vessel = relationship("Vessel")
 
     __table_args__ = (
         Index("ix_manifest_snap_vessel", "vessel_id"),
