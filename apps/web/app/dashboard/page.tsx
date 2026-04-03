@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 import { getDashboardSummary } from "@/lib/api";
 import { formatDate, formatDateTime, formatInteger } from "@/lib/format";
@@ -12,7 +13,6 @@ import { MetricCard } from "@/components/MetricCard";
 import { PageHeader } from "@/components/PageHeader";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -43,7 +43,6 @@ export default function DashboardPage() {
     }
 
     void load();
-
     return () => {
       ignore = true;
     };
@@ -61,7 +60,7 @@ export default function DashboardPage() {
     <div className="page-stack">
       <PageHeader
         title="Dashboard"
-        description="Live planner overview for shortages, fleet readiness, and the latest orchestration activity."
+        description="Live planner overview for shortages, fleet readiness, and current singleton planning snapshots."
         actions={
           <div className="page-actions">
             <Link href="/dispatch" className="button button-primary">
@@ -70,7 +69,12 @@ export default function DashboardPage() {
             <Link href="/inputs" className="button button-secondary">
               Review Inputs
             </Link>
-            <button type="button" className="button button-secondary" onClick={() => setReloadKey((current) => current + 1)} disabled={loading}>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => setReloadKey((current) => current + 1)}
+              disabled={loading}
+            >
               Refresh
             </button>
           </div>
@@ -84,62 +88,82 @@ export default function DashboardPage() {
         <>
           <div className="metric-grid">
             <MetricCard
-              label="Active Alerts"
-              value={formatInteger(summary.alert_count)}
-              detail="Dashboard warnings from effective stock and fleet pressure checks."
-              accent="rose"
+              label="M1 Snapshot"
+              value={
+                summary.live_snapshots.m1.generated_at
+                  ? formatDateTime(summary.live_snapshots.m1.generated_at)
+                  : "Not yet"
+              }
+              detail="Latest singleton M1 priority refresh."
+              accent="ink"
             />
             <MetricCard
-              label="Pending Drafts"
-              value={formatInteger(summary.pending_approvals)}
-              detail="Draft plan versions waiting for planner action."
+              label="M2 Snapshot"
+              value={
+                summary.live_snapshots.m2.generated_at
+                  ? formatDateTime(summary.live_snapshots.m2.generated_at)
+                  : "Not yet"
+              }
+              detail="Latest singleton M2 replenishment refresh."
               accent="amber"
             />
             <MetricCard
-              label="Approved Plans"
-              value={formatInteger(summary.approved_plans)}
-              detail="Frozen plan versions already committed to demo-state."
+              label="M3 Snapshot"
+              value={
+                summary.live_snapshots.m3.generated_at
+                  ? formatDateTime(summary.live_snapshots.m3.generated_at)
+                  : "Not yet"
+              }
+              detail="Latest live dispatch generation time."
               accent="teal"
             />
             <MetricCard
-              label="Active Manifests"
-              value={formatInteger(summary.active_manifests)}
-              detail="Inbound manifests still influencing planner priorities."
-              accent="primary"
+              label="M3 Status"
+              value={summary.m3_lock.locked ? "Locked" : "Open"}
+              detail={
+                summary.m3_lock.locked
+                  ? summary.m3_lock.lock_reason ?? "Current planning horizon is already approved."
+                  : `Current Day 1 starts on ${formatDate(summary.m3_lock.planning_start_date)}.`
+              }
+              accent="rose"
             />
           </div>
 
           <div className="two-up-grid">
             <SectionCard
-              title="Latest Engine Activity"
-              description="The planner console is on-demand, so runs only appear after a Generate Plan action."
+              title="Live Planning Workspace"
+              description="Current snapshot visibility across the singleton planner flow."
             >
-              {summary.latest_engine_run ? (
-                <div className="stack-list">
-                  <div className="list-card">
-                    <h4>Run #{summary.latest_engine_run.id}</h4>
-                    <p>
-                      {summary.latest_engine_run.engine_type.toUpperCase()} finished with status{" "}
-                      <StatusPill value={summary.latest_engine_run.status} />
-                    </p>
-                    <div className="detail-list">
-                      <span className="detail-chip">
-                        Started <strong>{formatDateTime(summary.latest_engine_run.started_at)}</strong>
-                      </span>
-                      <span className="detail-chip">
-                        Completed <strong>{formatDateTime(summary.latest_engine_run.completed_at)}</strong>
-                      </span>
-                    </div>
+              <div className="stack-list">
+                <div className="list-card">
+                  <h4>M1 Priorities</h4>
+                  <p>
+                    {summary.live_snapshots.m1.available
+                      ? `Updated ${formatDateTime(summary.live_snapshots.m1.generated_at)}.`
+                      : "No live M1 snapshot yet."}
+                  </p>
+                </div>
+                <div className="list-card">
+                  <h4>M2 Requests</h4>
+                  <p>
+                    {summary.live_snapshots.m2.available
+                      ? `Updated ${formatDateTime(summary.live_snapshots.m2.generated_at)}.`
+                      : "No live M2 snapshot yet."}
+                  </p>
+                </div>
+                <div className="list-card">
+                  <h4>M3 Dispatch</h4>
+                  <p>
+                    {summary.live_snapshots.m3.available
+                      ? `Updated ${formatDateTime(summary.live_snapshots.m3.generated_at)}.`
+                      : "No live M3 candidate set yet."}
+                  </p>
+                  <div className="detail-list">
+                    <span className="detail-chip">Approved plans {formatInteger(summary.approved_plans)}</span>
+                    <span className="detail-chip">Active manifests {formatInteger(summary.active_manifests)}</span>
                   </div>
                 </div>
-              ) : (
-                <EmptyState
-                  title="No engine runs yet"
-                  description="The seeded database is ready, but no plan has been generated from the planner console yet."
-                  actionHref="/dispatch"
-                  actionLabel="Generate From Dispatch"
-                />
-              )}
+              </div>
             </SectionCard>
 
             <SectionCard
@@ -163,16 +187,20 @@ export default function DashboardPage() {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'var(--color-surface)', 
-                          borderColor: 'var(--color-border)',
-                          borderRadius: '8px',
-                          color: 'var(--color-ink)'
-                        }} 
-                        itemStyle={{ color: 'var(--color-ink)' }} 
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--color-surface)",
+                          borderColor: "var(--color-border)",
+                          borderRadius: "8px",
+                          color: "var(--color-ink)",
+                        }}
+                        itemStyle={{ color: "var(--color-ink)" }}
                       />
-                      <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: 'var(--color-ink-soft)', fontSize: '0.85rem' }} />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        wrapperStyle={{ color: "var(--color-ink-soft)", fontSize: "0.85rem" }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -187,9 +215,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="list-card">
                     <h4>{formatInteger(summary.fleet_status.unavailable)} unavailable</h4>
-                    <p>
-                      Total fleet size is {formatInteger(summary.fleet_status.total)} vehicles in tomorrow&apos;s horizon.
-                    </p>
+                    <p>Total fleet size is {formatInteger(summary.fleet_status.total)} vehicles in tomorrow&apos;s horizon.</p>
                   </div>
                 </div>
               </div>
@@ -229,7 +255,10 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <p className="subtle-text">No active alerts at the moment.</p>
+              <EmptyState
+                title="No active alerts"
+                description="The current stock and fleet checks are clear."
+              />
             )}
           </SectionCard>
         </>

@@ -18,10 +18,18 @@ export type DashboardAlert = {
 };
 
 export type DashboardSummary = {
-  pending_approvals: number;
   approved_plans: number;
   active_manifests: number;
-  latest_engine_run: EngineRunSummary | null;
+  live_snapshots: {
+    m1: LiveSnapshot;
+    m2: LiveSnapshot;
+    m3: LiveSnapshot;
+  };
+  m3_lock: {
+    locked: boolean;
+    lock_reason: string | null;
+    planning_start_date: string;
+  };
   fleet_status: {
     business_date: string;
     total: number;
@@ -166,6 +174,7 @@ export type EngineRunSummary = {
   engine_type: EngineType;
   started_at: string | null;
   completed_at: string | null;
+  planning_start_date?: string | null;
   status: string;
   input_snapshot_ids?: Record<string, unknown> | null;
 };
@@ -198,8 +207,11 @@ export type M1SkuSummary = {
 };
 
 export type M1ResultsResponse = {
-  run_id: number;
+  available?: boolean;
+  run_id: number | null;
   status: string;
+  generated_at?: string | null;
+  planning_start_date?: string | null;
   line_results: M1LineResult[];
   sku_summary: M1SkuSummary[];
   total_lines: number;
@@ -219,8 +231,11 @@ export type M2Request = {
 };
 
 export type M2RequestsResponse = {
-  run_id: number;
+  available?: boolean;
+  run_id: number | null;
   status: string;
+  generated_at?: string | null;
+  planning_start_date?: string | null;
   requests: M2Request[];
   total_requests: number;
 };
@@ -238,8 +253,13 @@ export type M3PlanSummary = {
 };
 
 export type M3PlansResponse = {
-  run_id: number;
+  available?: boolean;
+  run_id: number | null;
   status: string;
+  generated_at?: string | null;
+  planning_start_date?: string | null;
+  locked?: boolean;
+  lock_reason?: string | null;
   plans: M3PlanSummary[];
   total_plans: number;
 };
@@ -282,13 +302,15 @@ export type M3PlanRun = {
 
 export type M3PlanDetail = {
   id: number;
-  run_id: number;
+  run_id: number | null;
   version_number: number;
   plan_status: "draft" | "approved" | "rejected" | string;
   score: number | null;
   is_best: boolean;
   approved_at: string | null;
   approved_by: string | null;
+  generated_at?: string | null;
+  planning_start_date?: string | null;
   runs: M3PlanRun[];
   stops: M3PlanFlatStop[];
   total_runs: number;
@@ -316,14 +338,22 @@ export type PlannerActionResponse = {
   plan_version_id?: number;
   reservations_created?: number;
   transfers_created?: number;
+  regenerated_plan_count?: number;
 };
 
 export type GeneratePlanResponse = {
   success: boolean;
   message: string;
   orchestration_time: string;
+  planning_start_date?: string;
   m3_run_id: number;
   m3_plans_count: number;
+};
+
+export type LiveSnapshot = {
+  available: boolean;
+  generated_at: string | null;
+  planning_start_date: string | null;
 };
 
 export type OverrideStopPayload = {
