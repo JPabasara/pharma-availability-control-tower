@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 
 import { AppShell } from "@/components/AppShell";
-import { RunContextProvider } from "@/lib/run-context";
 import { ThemeProvider } from "@/lib/theme-context";
 
 import "./globals.css";
@@ -23,6 +22,12 @@ export const metadata: Metadata = {
   description: "Planner console for dispatch generation, approval, and demo-state visibility.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -32,9 +37,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${headingFont.variable} ${bodyFont.variable}`} suppressHydrationWarning>
         <ThemeProvider>
-          <RunContextProvider>
-            <AppShell>{children}</AppShell>
-          </RunContextProvider>
+          <AppShell>{children}</AppShell>
         </ThemeProvider>
       </body>
     </html>

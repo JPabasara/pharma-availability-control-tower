@@ -16,9 +16,37 @@ from storage.models import EngineRun, M1Result, M2Request, M3PlanVersion
 router = APIRouter(prefix="/api/v1/orchestration", tags=["orchestration"])
 
 
+@router.post("/refresh-m2")
+def refresh_m2(db: Session = Depends(get_db)):
+    """Trigger the M2 engine isolated run."""
+    try:
+        result = orchestration_service.refresh_m2(db)
+        return {
+            "success": True,
+            "message": "M2 refreshed successfully.",
+            **result,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"M2 refresh failed: {str(e)}")
+
+
+@router.post("/refresh-m1")
+def refresh_m1(db: Session = Depends(get_db)):
+    """Trigger the M1 engine isolated run."""
+    try:
+        result = orchestration_service.refresh_m1(db)
+        return {
+            "success": True,
+            "message": "M1 refreshed successfully.",
+            **result,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"M1 refresh failed: {str(e)}")
+
+
 @router.post("/generate-plan")
 def generate_plan(db: Session = Depends(get_db)):
-    """Trigger the full orchestration pipeline: Read → M2 → M1 → M3.
+    """Trigger the M3 dispatch generation (locking and singleton check applied).
 
     This is the main action triggered by the planner clicking 'Generate Plan'.
     """
@@ -29,6 +57,9 @@ def generate_plan(db: Session = Depends(get_db)):
             "message": "Plan generated successfully.",
             **result,
         }
+    except ValueError as e:
+        # Lock validation exception
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Plan generation failed: {str(e)}")
 
@@ -54,6 +85,7 @@ def list_engine_runs(
                 "engine_type": r.engine_type,
                 "started_at": r.started_at.isoformat() if r.started_at else None,
                 "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                "planning_start_date": r.planning_start_date.isoformat() if r.planning_start_date else None,
                 "status": r.status,
                 "input_snapshot_ids": r.input_snapshot_ids,
             }
@@ -75,6 +107,7 @@ def get_engine_run(run_id: int, db: Session = Depends(get_db)):
         "engine_type": run.engine_type,
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "planning_start_date": run.planning_start_date.isoformat() if run.planning_start_date else None,
         "status": run.status,
         "input_snapshot_ids": run.input_snapshot_ids,
     }

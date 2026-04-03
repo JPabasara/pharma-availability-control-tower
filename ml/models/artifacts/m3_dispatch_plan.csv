@@ -1,0 +1,10 @@
+lorry_id,lorry_type,dc_id,sku_id,category,quantity_dispatched
+L-01,normal,DC-03,SKU-008,antiviral,500
+L-02,normal,DC-05,SKU-014,antibiotic,500
+L-03,normal,DC-05,SKU-014,antibiotic,500
+L-04,normal,DC-05,SKU-014,antibiotic,500
+L-05,normal,DC-05,SKU-014,antibiotic,500
+L-R1,reefer,DC-01,SKU-005,reefer,350
+L-R2,reefer,DC-01,SKU-013,reefer,348
+L-R2,reefer,DC-02,SKU-010,reefer,2
+L-R3,reefer,DC-05,SKU-013,reefer,350

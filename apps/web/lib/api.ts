@@ -192,16 +192,44 @@ export function generatePlan() {
   });
 }
 
+export function refreshM1() {
+  return apiFetch<any>("/api/v1/orchestration/refresh-m1", {
+    method: "POST",
+  });
+}
+
+export function refreshM2() {
+  return apiFetch<any>("/api/v1/orchestration/refresh-m2", {
+    method: "POST",
+  });
+}
+
+export function getCurrentM1Results() {
+  return apiFetch<M1ResultsResponse>("/api/v1/planner/m1-results/current");
+}
+
 export function getM1Results(runId: number) {
   return apiFetch<M1ResultsResponse>(`/api/v1/planner/m1-results/${runId}`);
+}
+
+export function getCurrentM2Requests() {
+  return apiFetch<M2RequestsResponse>("/api/v1/planner/m2-requests/current");
 }
 
 export function getM2Requests(runId: number) {
   return apiFetch<M2RequestsResponse>(`/api/v1/planner/m2-requests/${runId}`);
 }
 
+export function getCurrentM3Plans() {
+  return apiFetch<M3PlansResponse>("/api/v1/planner/m3-plans/current");
+}
+
 export function getM3Plans(runId: number) {
   return apiFetch<M3PlansResponse>(`/api/v1/planner/m3-plans/${runId}`);
+}
+
+export function getCurrentM3PlanDetail(versionId: number) {
+  return apiFetch<M3PlanDetail>(`/api/v1/planner/m3-plans/current/${versionId}`);
 }
 
 export function getM3PlanDetail(runId: number, versionId: number) {

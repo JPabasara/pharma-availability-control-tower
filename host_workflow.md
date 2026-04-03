@@ -25,25 +25,31 @@ Render is an excellent host that automatically builds from our `Dockerfile`. Sin
    - **Instance Type**: Select the Free tier (or appropriate upgraded tier).
 4. Scroll down to **Environment Variables** and add these exactly 5 variables:
    - `DATABASE_URL`: **Paste your Neon Postgres Connection String exactly.**
-   - `ENGINE_MODE`: `stub`
+   - `ENGINE_MODE`: `real` *(We are now running the real engines)*
    - `BUSINESS_TIMEZONE`: `Asia/Colombo`
    - `ALLOWED_ORIGINS`: `*` *(We'll keep CORS open for the very first deployment)*
    - `PYTHON_VERSION`: `3.12.0` *(Sometimes required by Render just to be safe)*
 5. Click **Deploy Web Service**. Render will securely build your Docker container. Wait until it shows the Green "Live" status, and copy the domain link (e.g., `https://pharma-...onrender.com`).
 
-## Phase 3: Fresh Database Seeding
-Your Neon database will be initialized by the Docker deployment (`alembic upgrade head`), but the tables are empty. We must push the demo data from your local machine.
+## Phase 3: Fresh Database Initialization & Seeding
+If you are deploying for the first time, or if you need to wipe your database and start fresh with new demo data, follow these steps locally:
+
 1. Copy your Neon **Connection String** again.
 2. Open PowerShell locally in your project folder.
 3. Set your local environment variable:
    ```powershell
    $env:DATABASE_URL="<your-neon-database-url>"
    ```
-4. Run the seed script:
+4. **Important for starting fresh:** Wipe the existing schema and rebuild it to ensure a clean slate:
+   ```powershell
+   .\.venv\Scripts\alembic downgrade base
+   .\.venv\Scripts\alembic upgrade head
+   ```
+5. Run the seed script to populate the database:
    ```powershell
    .\.venv\Scripts\python db\seeds\seed_all.py
    ```
-5. Once it finishes successfully, securely remove the local environment variable:
+6. Once it finishes successfully, securely remove the local environment variable:
    ```powershell
    Remove-Item Env:\DATABASE_URL
    ```

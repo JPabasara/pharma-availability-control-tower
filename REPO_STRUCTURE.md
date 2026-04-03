@@ -24,7 +24,7 @@ pharma-availability-control-tower/
 |       |-- app/                # frontend routes and pages
 |       |   |-- dashboard/      # summary, alerts, and pending decisions
 |       |   |-- inputs/         # read-only snapshot views
-|       |   |-- priorities/     # M1 line scores and SKU summary
+|       |   |-- priorities/     # M1 shipment priority ranking with expandable per-SKU breakdown
 |       |   |-- requests/       # M2 request and urgency views
 |       |   |-- dispatch/       # M3 plan comparison and draft editing
 |       |   |-- history/        # approved versions and override trail

@@ -1,22 +1,22 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
 
 import {
   ApiError,
   approvePlan,
   generatePlan,
+  getCurrentM1Results,
+  getCurrentM2Requests,
+  getCurrentM3PlanDetail,
+  getCurrentM3Plans,
   getDcStock,
   getLorryState,
-  getM3PlanDetail,
-  getM3Plans,
   getWarehouseStock,
   overridePlan,
   rejectPlan,
 } from "@/lib/api";
-import { formatDateTime, formatInteger, formatNumber, getPlanLabel } from "@/lib/format";
-import { usePlannerRunContext, useResolvedRunId } from "@/lib/run-context";
+import { formatDate, formatDateTime, formatInteger, formatNumber, getPlanLabel } from "@/lib/format";
 import type {
   DcStockContract,
   LorryState,
@@ -25,6 +25,7 @@ import type {
   OverrideRunPayload,
   WarehouseStockItem,
 } from "@/lib/types";
+import { DispatchOverrideEditor, type EditableRun, type EditableStop } from "@/components/DispatchOverrideEditor";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { MetricCard } from "@/components/MetricCard";
@@ -32,9 +33,6 @@ import { PageHeader } from "@/components/PageHeader";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 
-type EditableItem = { clientId: string; sku_id: number; quantity: number };
-type EditableStop = { clientId: string; dc_id: number; stop_sequence: number; items: EditableItem[] };
-type EditableRun = { clientId: string; lorry_id: number; dispatch_day: number; stops: EditableStop[] };
 type NoticeState = { tone: "success" | "error" | "info"; title: string; message: string; items?: string[] };
 
 function makeId(prefix: string) {
@@ -98,10 +96,6 @@ function parseApiError(error: unknown): NoticeState {
   };
 }
 
-function describeLorry(lorry: LorryState) {
-  return `${lorry.registration} | ${lorry.lorry_type} | cap ${lorry.capacity_units} | D1 ${lorry.day1_status} | D2 ${lorry.day2_status}`;
-}
-
 function totalRunUnits(run: { stops: Array<{ items: Array<{ quantity: number }> }> }) {
   return run.stops.reduce(
     (sum, stop) => sum + stop.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
@@ -110,10 +104,6 @@ function totalRunUnits(run: { stops: Array<{ items: Array<{ quantity: number }> 
 }
 
 function DispatchPageContent() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { runContext, setRunContext } = usePlannerRunContext();
-  const { runId, loading: runLoading, error: runError } = useResolvedRunId("m3");
   const [plans, setPlans] = useState<M3PlanSummary[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [detail, setDetail] = useState<M3PlanDetail | null>(null);
@@ -121,7 +111,7 @@ function DispatchPageContent() {
   const [decisionNotes, setDecisionNotes] = useState("");
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [loadingWorkspace, setLoadingWorkspace] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [referenceLoading, setReferenceLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -130,6 +120,12 @@ function DispatchPageContent() {
   const [lorryOptions, setLorryOptions] = useState<LorryState[]>([]);
   const [dcOptions, setDcOptions] = useState<DcStockContract[]>([]);
   const [skuOptions, setSkuOptions] = useState<WarehouseStockItem[]>([]);
+  const [m1GeneratedAt, setM1GeneratedAt] = useState<string | null>(null);
+  const [m2GeneratedAt, setM2GeneratedAt] = useState<string | null>(null);
+  const [m3GeneratedAt, setM3GeneratedAt] = useState<string | null>(null);
+  const [planningStartDate, setPlanningStartDate] = useState<string | null>(null);
+  const [m3Locked, setM3Locked] = useState(false);
+  const [m3LockReason, setM3LockReason] = useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -149,9 +145,7 @@ function DispatchPageContent() {
         }
       } catch (cause) {
         if (!ignore) {
-          setReferenceError(
-            cause instanceof Error ? cause.message : "Unable to load dispatch reference data."
-          );
+          setReferenceError(cause instanceof Error ? cause.message : "Unable to load dispatch reference data.");
         }
       } finally {
         if (!ignore) {
@@ -165,54 +159,55 @@ function DispatchPageContent() {
     };
   }, []);
 
-  useEffect(() => {
-    let ignore = false;
-    async function loadPlans(activeRunId: number, preferredPlanId?: number | null) {
-      setLoadingPlans(true);
-      setPageError(null);
-      try {
-        const response = await getM3Plans(activeRunId);
-        if (ignore) {
-          return;
-        }
-        setPlans(response.plans);
-        const selected =
-          preferredPlanId ??
-          response.plans.find((plan) => plan.id === selectedPlanId)?.id ??
-          response.plans.find((plan) => plan.is_best)?.id ??
-          response.plans[0]?.id ??
-          null;
-        setSelectedPlanId(selected);
-      } catch (cause) {
-        if (!ignore) {
-          setPageError(cause instanceof Error ? cause.message : "Unable to load candidate plans.");
-          setPlans([]);
-          setSelectedPlanId(null);
-        }
-      } finally {
-        if (!ignore) {
-          setLoadingPlans(false);
-        }
+  async function loadWorkspace(preferredPlanId?: number | null) {
+    setLoadingWorkspace(true);
+    setPageError(null);
+    try {
+      const [m1Response, m2Response, m3Response] = await Promise.all([
+        getCurrentM1Results(),
+        getCurrentM2Requests(),
+        getCurrentM3Plans(),
+      ]);
+
+      setM1GeneratedAt(m1Response.generated_at ?? null);
+      setM2GeneratedAt(m2Response.generated_at ?? null);
+      setM3GeneratedAt(m3Response.generated_at ?? null);
+      setPlanningStartDate(m3Response.planning_start_date ?? m1Response.planning_start_date ?? m2Response.planning_start_date ?? null);
+      setM3Locked(Boolean(m3Response.locked));
+      setM3LockReason(m3Response.lock_reason ?? null);
+      setPlans(m3Response.plans);
+
+      const nextSelected =
+        preferredPlanId && m3Response.plans.some((plan) => plan.id === preferredPlanId)
+          ? preferredPlanId
+          : m3Response.plans.find((plan) => plan.is_best)?.id ?? m3Response.plans[0]?.id ?? null;
+      setSelectedPlanId(nextSelected);
+      if (!nextSelected) {
+        setDetail(null);
+        setDraftRuns([]);
       }
-    }
-    if (runId) {
-      void loadPlans(runId);
-    } else {
+    } catch (cause) {
+      setPageError(cause instanceof Error ? cause.message : "Unable to load current dispatch workspace.");
       setPlans([]);
       setSelectedPlanId(null);
+      setDetail(null);
+      setDraftRuns([]);
+    } finally {
+      setLoadingWorkspace(false);
     }
-    return () => {
-      ignore = true;
-    };
-  }, [runId, selectedPlanId]);
+  }
+
+  useEffect(() => {
+    void loadWorkspace();
+  }, []);
 
   useEffect(() => {
     let ignore = false;
-    async function loadDetail(activeRunId: number, planId: number) {
+    async function loadDetail(planId: number) {
       setLoadingDetail(true);
       setPageError(null);
       try {
-        const response = await getM3PlanDetail(activeRunId, planId);
+        const response = await getCurrentM3PlanDetail(planId);
         if (!ignore) {
           setDetail(response);
           setDraftRuns(mapDetailToDraft(response));
@@ -230,8 +225,9 @@ function DispatchPageContent() {
         }
       }
     }
-    if (runId && selectedPlanId) {
-      void loadDetail(runId, selectedPlanId);
+
+    if (selectedPlanId) {
+      void loadDetail(selectedPlanId);
     } else {
       setDetail(null);
       setDraftRuns([]);
@@ -239,7 +235,7 @@ function DispatchPageContent() {
     return () => {
       ignore = true;
     };
-  }, [runId, selectedPlanId]);
+  }, [selectedPlanId]);
 
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
@@ -255,39 +251,26 @@ function DispatchPageContent() {
     [detail]
   );
   const isDraftSelected = selectedPlan?.plan_status === "draft";
-
-  function syncRunContext(m1RunId: number, m2RunId: number, m3RunId: number, generatedAt: string) {
-    const nextContext = { m1RunId, m2RunId, m3RunId, generatedAt };
-    setRunContext(nextContext);
-    const params = new URLSearchParams();
-    params.set("m1RunId", String(m1RunId));
-    params.set("m2RunId", String(m2RunId));
-    params.set("m3RunId", String(m3RunId));
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }
+  const selectedPlanLabel = selectedPlan ? getPlanLabel(selectedPlan.version_number) : "Selected plan";
 
   function updateRun(clientId: string, updater: (current: EditableRun) => EditableRun) {
     setDraftRuns((current) => current.map((run) => (run.clientId === clientId ? updater(run) : run)));
   }
-
   function updateStop(runClientId: string, stopClientId: string, updater: (current: EditableStop) => EditableStop) {
     updateRun(runClientId, (run) => ({
       ...run,
       stops: run.stops.map((stop) => (stop.clientId === stopClientId ? updater(stop) : stop)),
     }));
   }
-
   function removeRun(clientId: string) {
     setDraftRuns((current) => current.filter((run) => run.clientId !== clientId));
   }
-
   function removeStop(runClientId: string, stopClientId: string) {
     updateRun(runClientId, (run) => ({
       ...run,
       stops: run.stops.filter((stop) => stop.clientId !== stopClientId),
     }));
   }
-
   function addRun() {
     const defaultLorry = lorryOptions[0];
     const defaultDc = dcOptions[0];
@@ -301,18 +284,15 @@ function DispatchPageContent() {
         clientId: makeId("run"),
         lorry_id: defaultLorry.lorry_id,
         dispatch_day: 1,
-        stops: [
-          {
-            clientId: makeId("stop"),
-            dc_id: defaultDc.dc_id,
-            stop_sequence: 1,
-            items: [{ clientId: makeId("item"), sku_id: defaultSku.sku_id, quantity: 0 }],
-          },
-        ],
+        stops: [{
+          clientId: makeId("stop"),
+          dc_id: defaultDc.dc_id,
+          stop_sequence: 1,
+          items: [{ clientId: makeId("item"), sku_id: defaultSku.sku_id, quantity: 0 }],
+        }],
       },
     ]);
   }
-
   function addStop(runClientId: string) {
     const defaultDc = dcOptions[0];
     const defaultSku = skuOptions[0];
@@ -321,18 +301,14 @@ function DispatchPageContent() {
     }
     updateRun(runClientId, (run) => ({
       ...run,
-      stops: [
-        ...run.stops,
-        {
-          clientId: makeId("stop"),
-          dc_id: defaultDc.dc_id,
-          stop_sequence: run.stops.reduce((max, stop) => Math.max(max, stop.stop_sequence), 0) + 1,
-          items: [{ clientId: makeId("item"), sku_id: defaultSku.sku_id, quantity: 0 }],
-        },
-      ],
+      stops: [...run.stops, {
+        clientId: makeId("stop"),
+        dc_id: defaultDc.dc_id,
+        stop_sequence: run.stops.reduce((max, stop) => Math.max(max, stop.stop_sequence), 0) + 1,
+        items: [{ clientId: makeId("item"), sku_id: defaultSku.sku_id, quantity: 0 }],
+      }],
     }));
   }
-
   function addItem(runClientId: string, stopClientId: string) {
     const defaultSku = skuOptions[0];
     if (!defaultSku) {
@@ -343,7 +319,6 @@ function DispatchPageContent() {
       items: [...stop.items, { clientId: makeId("item"), sku_id: defaultSku.sku_id, quantity: 0 }],
     }));
   }
-
   function removeItem(runClientId: string, stopClientId: string, itemClientId: string) {
     updateStop(runClientId, stopClientId, (stop) => ({
       ...stop,
@@ -356,12 +331,12 @@ function DispatchPageContent() {
     setNotice(null);
     setValidationWarnings([]);
     try {
-      const response = await generatePlan();
-      syncRunContext(response.m1_run_id, response.m2_run_id, response.m3_run_id, response.orchestration_time);
+      await generatePlan();
+      await loadWorkspace();
       setNotice({
         tone: "success",
         title: "Plan generated",
-        message: `Created M1 run #${response.m1_run_id}, M2 run #${response.m2_run_id}, and M3 run #${response.m3_run_id}.`,
+        message: "M2, M1, and M3 were refreshed and the live candidate set was replaced.",
       });
     } catch (cause) {
       setNotice(parseApiError(cause));
@@ -371,25 +346,17 @@ function DispatchPageContent() {
   }
 
   async function handleApprove() {
-    if (!selectedPlanId || !runId) {
-      return;
-    }
+    if (!selectedPlanId) return;
     setActionLoading(true);
     setNotice(null);
     try {
       const response = await approvePlan(selectedPlanId);
+      await loadWorkspace();
       setNotice({
         tone: "success",
         title: "Plan approved",
-        message:
-          `${response.message} ` +
-          `Reservations: ${formatInteger(response.reservations_created ?? 0)}, transfers: ${formatInteger(response.transfers_created ?? 0)}.`,
+        message: `${response.message} Reservations: ${formatInteger(response.reservations_created ?? 0)}, transfers: ${formatInteger(response.transfers_created ?? 0)}.`,
       });
-      const latestPlans = await getM3Plans(runId);
-      setPlans(latestPlans.plans);
-      const refreshed = await getM3PlanDetail(runId, selectedPlanId);
-      setDetail(refreshed);
-      setDraftRuns(mapDetailToDraft(refreshed));
     } catch (cause) {
       setNotice(parseApiError(cause));
     } finally {
@@ -398,19 +365,13 @@ function DispatchPageContent() {
   }
 
   async function handleReject() {
-    if (!selectedPlanId || !runId) {
-      return;
-    }
+    if (!selectedPlanId) return;
     setActionLoading(true);
     setNotice(null);
     try {
       const response = await rejectPlan(selectedPlanId, decisionNotes);
+      await loadWorkspace();
       setNotice({ tone: "info", title: "Plan rejected", message: response.message });
-      const latestPlans = await getM3Plans(runId);
-      setPlans(latestPlans.plans);
-      const refreshed = await getM3PlanDetail(runId, selectedPlanId);
-      setDetail(refreshed);
-      setDraftRuns(mapDetailToDraft(refreshed));
     } catch (cause) {
       setNotice(parseApiError(cause));
     } finally {
@@ -419,30 +380,14 @@ function DispatchPageContent() {
   }
 
   async function handleOverride() {
-    if (!selectedPlanId || !runId) {
-      return;
-    }
+    if (!selectedPlanId) return;
     const payload = buildOverridePayload(draftRuns);
     if (!payload.length) {
-      setNotice({
-        tone: "error",
-        title: "Override payload is incomplete",
-        message: "Add at least one run before submitting an override.",
-      });
+      setNotice({ tone: "error", title: "Override payload is incomplete", message: "Add at least one run before submitting an override." });
       return;
     }
-    if (
-      payload.some(
-        (run) =>
-          !run.stops.length ||
-          run.stops.some((stop) => !stop.items.length || stop.items.some((item) => item.quantity <= 0))
-      )
-    ) {
-      setNotice({
-        tone: "error",
-        title: "Override payload is incomplete",
-        message: "Each run needs at least one stop, and each stop needs at least one item with a positive quantity.",
-      });
+    if (payload.some((run) => !run.stops.length || run.stops.some((stop) => !stop.items.length || stop.items.some((item) => item.quantity <= 0)))) {
+      setNotice({ tone: "error", title: "Override payload is incomplete", message: "Each run needs at least one stop, and each stop needs at least one item with a positive quantity." });
       return;
     }
     setActionLoading(true);
@@ -451,20 +396,12 @@ function DispatchPageContent() {
     try {
       const response = await overridePlan(selectedPlanId, payload, decisionNotes);
       setValidationWarnings(response.validation?.warnings ?? []);
+      await loadWorkspace(selectedPlanId);
       setNotice({
         tone: "success",
-        title: "Override created",
-        message:
-          response.message +
-          (response.validation?.warnings?.length ? " Validation warnings are shown below." : ""),
+        title: "Override saved",
+        message: response.message + (response.validation?.warnings?.length ? " Validation warnings are shown below." : ""),
       });
-      const latestPlans = await getM3Plans(runId);
-      setPlans(latestPlans.plans);
-      const nextPlanId =
-        response.new_plan_version_id ??
-        latestPlans.plans[latestPlans.plans.length - 1]?.id ??
-        selectedPlanId;
-      setSelectedPlanId(nextPlanId);
     } catch (cause) {
       setNotice(parseApiError(cause));
     } finally {
@@ -475,24 +412,18 @@ function DispatchPageContent() {
   return (
     <div className="page-stack">
       <PageHeader
-        title="M3 Dispatch"
-        description="Generate plans, compare candidate dispatches, edit run-based overrides, and approve the final two-day lorry schedule."
+        title="Optimizer"
+        description="Generate the live plan set, compare candidate dispatches, edit overrides, and approve the final two-day lorry schedule."
         actions={
           <div className="page-actions">
-            <button
-              type="button"
-              className="button button-primary"
-              onClick={() => void handleGeneratePlan()}
-              disabled={actionLoading}
-            >
-              {actionLoading ? "Working..." : "Generate Plan"}
+            <button type="button" className="button button-primary" onClick={() => void handleGeneratePlan()} disabled={actionLoading || m3Locked}>
+              {actionLoading ? "..." : "Generate Plan"}
             </button>
           </div>
         }
       />
 
-      {runLoading || referenceLoading || loadingPlans || loadingDetail ? <LoadingPanel label="Loading dispatch workspace..." /> : null}
-      {runError ? <div className="notice notice-error"><p>{runError}</p></div> : null}
+      {loadingWorkspace || loadingDetail || referenceLoading ? <LoadingPanel label="Loading dispatch workspace..." /> : null}
       {referenceError ? <div className="notice notice-error"><p>{referenceError}</p></div> : null}
       {pageError ? <div className="notice notice-error"><p>{pageError}</p></div> : null}
       {notice ? (
@@ -509,37 +440,30 @@ function DispatchPageContent() {
         </div>
       ) : null}
 
-      {runContext?.m1RunId || runContext?.m2RunId || runContext?.m3RunId ? (
-        <div className="metric-grid">
-          <MetricCard label="M1 Run" value={runContext?.m1RunId ? `#${runContext.m1RunId}` : "None"} detail="Priority results linked into the current planner session." accent="ink" />
-          <MetricCard label="M2 Run" value={runContext?.m2RunId ? `#${runContext.m2RunId}` : "None"} detail="Request generation context preserved across page refreshes." accent="amber" />
-          <MetricCard label="M3 Run" value={runContext?.m3RunId ? `#${runContext.m3RunId}` : "None"} detail="Candidate plan set currently active in Dispatch." accent="teal" />
-          <MetricCard label="Generated At" value={runContext?.generatedAt ? formatDateTime(runContext.generatedAt) : "Not yet"} detail="Stored in local run context after Generate Plan." accent="rose" />
-        </div>
-      ) : null}
+      <div className="metric-grid">
+        <MetricCard label="Prioritizer Updated" value={m1GeneratedAt ? formatDateTime(m1GeneratedAt) : "Not yet"} detail="Latest priority snapshot." accent="ink" />
+        <MetricCard label="Forecaster Updated" value={m2GeneratedAt ? formatDateTime(m2GeneratedAt) : "Not yet"} detail="Latest replenishment snapshot." accent="amber" />
+        <MetricCard label="Optimizer Updated" value={m3GeneratedAt ? formatDateTime(m3GeneratedAt) : "Not yet"} detail={planningStartDate ? `Current Day 1 starts on ${formatDate(planningStartDate)}.` : "No live dispatch generation yet."} accent="teal" />
+        <MetricCard label="Optimizer Status" value={m3Locked ? "Locked" : "Open"} detail={m3Locked ? m3LockReason ?? "Current horizon is already approved." : "Generate Plan refreshes Forecaster, Prioritizer, and Optimizer together."} accent="rose" />
+      </div>
 
-      {!runLoading && !runId ? (
+      {!loadingWorkspace && !plans.length ? (
         <EmptyState
-          title="No dispatch run yet"
-          description="The seeded environment is ready. Generate a plan to create M1, M2, and M3 runs and unlock the planner workflow."
+          title={m3Locked ? "Dispatch locked for the current horizon" : "No live dispatch candidates yet"}
+          description={m3Locked ? m3LockReason ?? "Generate Plan will unlock automatically on the next business day." : "Generate Plan refreshes Forecaster, Prioritizer, and Optimizer, then replaces the live candidate set with the latest draft plans."}
         />
       ) : null}
 
       {plans.length ? (
         <div className="split-layout">
-          <SectionCard title="Candidate Plans" description="Compare score, day allocation, and stop counts before selecting one.">
+          <SectionCard title="Candidate Plans" description="Compare the current draft candidates before selecting one.">
             <div className="plan-list">
               {plans.map((plan) => (
-                <button
-                  key={plan.id}
-                  type="button"
-                  className={`plan-card${plan.id === selectedPlanId ? " plan-card-active" : ""}`}
-                  onClick={() => setSelectedPlanId(plan.id)}
-                >
+                <button key={plan.id} type="button" className={`plan-card${plan.id === selectedPlanId ? " plan-card-active" : ""}`} onClick={() => setSelectedPlanId(plan.id)}>
                   <div className="plan-card-header">
                     <div>
                       <h4>{getPlanLabel(plan.version_number)}</h4>
-                      <p>Version #{plan.version_number}</p>
+                      <p>{plan.plan_status === "draft" ? "Live candidate plan" : `Status ${plan.plan_status}`}</p>
                     </div>
                     <div className="button-row">
                       {plan.is_best ? <StatusPill value="best" tone="success" /> : null}
@@ -551,7 +475,7 @@ function DispatchPageContent() {
                     <span className="detail-chip">Runs {formatInteger(plan.run_count)}</span>
                     <span className="detail-chip">Stops {formatInteger(plan.stop_count)}</span>
                   </div>
-                  <p className="subtle-text">Approved {formatDateTime(plan.approved_at)}</p>
+                  <p className="subtle-text">{m3GeneratedAt ? `Updated ${formatDateTime(m3GeneratedAt)}` : "Ready for planner review."}</p>
                 </button>
               ))}
             </div>
@@ -561,10 +485,10 @@ function DispatchPageContent() {
             {detail ? (
               <div className="panel-grid">
                 <div className="cards-grid">
-                  <MetricCard label="Version" value={`#${detail.version_number}`} detail={`Status ${detail.plan_status}`} accent="ink" />
+                  <MetricCard label="Candidate" value={selectedPlanLabel} detail={`Status ${detail.plan_status}`} accent="ink" />
                   <MetricCard label="Runs" value={formatInteger(detail.total_runs)} detail={`${formatInteger(detail.total_stops)} stops across the approved horizon.`} accent="teal" />
-                  <MetricCard label="Loaded Units" value={formatInteger(selectedUnits)} detail="Total quantity carried by the selected version." accent="amber" />
-                  <MetricCard label="Plan Score" value={formatNumber(detail.score ?? 0)} detail={detail.is_best ? "Best candidate from the current run." : "Alternate dispatch candidate."} accent="rose" />
+                  <MetricCard label="Loaded Units" value={formatInteger(selectedUnits)} detail="Total quantity carried by the selected candidate." accent="amber" />
+                  <MetricCard label="Plan Score" value={formatNumber(detail.score ?? 0)} detail={detail.is_best ? "Best candidate from the current generation." : "Alternate dispatch candidate."} accent="rose" />
                 </div>
 
                 <div className="stack-list">
@@ -579,7 +503,7 @@ function DispatchPageContent() {
                       </div>
                       <div className="detail-list">
                         <span className="detail-chip">Units {formatInteger(totalRunUnits(run))}</span>
-                        <span className="detail-chip">Lorry #{run.lorry_id}</span>
+                        <span className="detail-chip">Lorry {run.registration}</span>
                       </div>
                       <div className="stack-list">
                         {run.stops.map((stop) => (
@@ -606,222 +530,37 @@ function DispatchPageContent() {
       ) : null}
 
       {detail ? (
-        <SectionCard
-          title="Structured Override Editor"
-          description="Edit the full run schedule, including dispatch day, stop order, lorry assignment, and item quantities."
-          actions={
-            <div className="section-card-actions">
-              <button type="button" className="button button-secondary" onClick={addRun}>
-                Add Run
-              </button>
-            </div>
-          }
-        >
-          <div className="editor-grid">
-            {draftRuns.map((run) => {
-              const selectedLorry = lorryOptions.find((lorry) => lorry.lorry_id === run.lorry_id);
-              return (
-                <article key={run.clientId} className="editor-run">
-                  <div className="editor-run-header">
-                    <div>
-                      <h4>Editable Run</h4>
-                      <p className="subtle-text">Dispatch day and lorry assignment are part of the override payload.</p>
-                    </div>
-                    <button type="button" className="button button-ghost" onClick={() => removeRun(run.clientId)}>
-                      Remove Run
-                    </button>
-                  </div>
-
-                  <div className="field-grid">
-                    <div className="form-field">
-                      <label htmlFor={`${run.clientId}-lorry`}>Lorry</label>
-                      <select
-                        id={`${run.clientId}-lorry`}
-                        value={run.lorry_id}
-                        onChange={(event) =>
-                          updateRun(run.clientId, (current) => ({ ...current, lorry_id: Number(event.target.value) }))
-                        }
-                      >
-                        {lorryOptions.map((lorry) => (
-                          <option key={lorry.lorry_id} value={lorry.lorry_id}>
-                            {describeLorry(lorry)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="form-field">
-                      <label htmlFor={`${run.clientId}-day`}>Dispatch Day</label>
-                      <select
-                        id={`${run.clientId}-day`}
-                        value={run.dispatch_day}
-                        onChange={(event) =>
-                          updateRun(run.clientId, (current) => ({ ...current, dispatch_day: Number(event.target.value) }))
-                        }
-                      >
-                        <option value={1}>Day 1</option>
-                        <option value={2}>Day 2</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {selectedLorry ? (
-                    <p className="subtle-text">
-                      Horizon status: Day 1 {selectedLorry.day1_status}, Day 2 {selectedLorry.day2_status}.
-                    </p>
-                  ) : null}
-
-                  <div className="stack-list">
-                    {run.stops.map((stop) => (
-                      <article key={stop.clientId} className="editor-stop">
-                        <div className="editor-stop-header">
-                          <div>
-                            <h4>Stop Payload</h4>
-                            <p className="subtle-text">Each run may contain up to two DC stops after validation.</p>
-                          </div>
-                          <button type="button" className="button button-ghost" onClick={() => removeStop(run.clientId, stop.clientId)}>
-                            Remove Stop
-                          </button>
-                        </div>
-
-                        <div className="field-grid">
-                          <div className="form-field">
-                            <label htmlFor={`${stop.clientId}-dc`}>Distribution Center</label>
-                            <select
-                              id={`${stop.clientId}-dc`}
-                              value={stop.dc_id}
-                              onChange={(event) =>
-                                updateStop(run.clientId, stop.clientId, (current) => ({ ...current, dc_id: Number(event.target.value) }))
-                              }
-                            >
-                              {dcOptions.map((dc) => (
-                                <option key={dc.dc_id} value={dc.dc_id}>
-                                  {dc.dc_code} - {dc.dc_name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="form-field">
-                            <label htmlFor={`${stop.clientId}-sequence`}>Stop Sequence</label>
-                            <input
-                              id={`${stop.clientId}-sequence`}
-                              type="number"
-                              min={1}
-                              value={stop.stop_sequence}
-                              onChange={(event) =>
-                                updateStop(run.clientId, stop.clientId, (current) => ({ ...current, stop_sequence: Number(event.target.value) }))
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        <div className="items-list">
-                          {stop.items.map((item) => (
-                            <div key={item.clientId} className="item-row">
-                              <div className="form-field">
-                                <label htmlFor={`${item.clientId}-sku`}>SKU</label>
-                                <select
-                                  id={`${item.clientId}-sku`}
-                                  value={item.sku_id}
-                                  onChange={(event) =>
-                                    updateStop(run.clientId, stop.clientId, (current) => ({
-                                      ...current,
-                                      items: current.items.map((currentItem) =>
-                                        currentItem.clientId === item.clientId
-                                          ? { ...currentItem, sku_id: Number(event.target.value) }
-                                          : currentItem
-                                      ),
-                                    }))
-                                  }
-                                >
-                                  {skuOptions.map((sku) => (
-                                    <option key={sku.sku_id} value={sku.sku_id}>
-                                      {sku.sku_code} - {sku.sku_name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <div className="form-field">
-                                <label htmlFor={`${item.clientId}-qty`}>Quantity</label>
-                                <input
-                                  id={`${item.clientId}-qty`}
-                                  type="number"
-                                  min={0}
-                                  value={item.quantity}
-                                  onChange={(event) =>
-                                    updateStop(run.clientId, stop.clientId, (current) => ({
-                                      ...current,
-                                      items: current.items.map((currentItem) =>
-                                        currentItem.clientId === item.clientId
-                                          ? { ...currentItem, quantity: Number(event.target.value) }
-                                          : currentItem
-                                      ),
-                                    }))
-                                  }
-                                />
-                              </div>
-
-                              <button type="button" className="button button-ghost" onClick={() => removeItem(run.clientId, stop.clientId, item.clientId)}>
-                                Remove Item
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="toolbar">
-                          <button type="button" className="button button-secondary" onClick={() => addItem(run.clientId, stop.clientId)}>
-                            Add Item
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  <div className="toolbar">
-                    <button type="button" className="button button-secondary" onClick={() => addStop(run.clientId)}>
-                      Add Stop
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+        <SectionCard title="Structured Override Editor" description="Edit the full run schedule, including dispatch day, stop order, lorry assignment, and item quantities.">
+          <DispatchOverrideEditor
+            draftRuns={draftRuns}
+            lorryOptions={lorryOptions}
+            dcOptions={dcOptions}
+            skuOptions={skuOptions}
+            onAddRun={addRun}
+            onRemoveRun={removeRun}
+            onUpdateRun={updateRun}
+            onUpdateStop={updateStop}
+            onRemoveStop={removeStop}
+            onAddStop={addStop}
+            onAddItem={addItem}
+            onRemoveItem={removeItem}
+          />
         </SectionCard>
       ) : null}
 
-      <SectionCard
-        title="Planner Actions"
-        description="Notes are reused for reject and override actions and appear in audit and report views."
-      >
+      <SectionCard title="Planner Actions" description="Notes are reused for reject and override actions and appear in audit and report views.">
         <div className="form-field">
           <label htmlFor="decisionNotes">Planner notes</label>
-          <textarea
-            id="decisionNotes"
-            value={decisionNotes}
-            onChange={(event) => setDecisionNotes(event.target.value)}
-            placeholder="Explain why this version was overridden or rejected."
-          />
+          <textarea id="decisionNotes" value={decisionNotes} onChange={(event) => setDecisionNotes(event.target.value)} placeholder="Explain why this candidate was overridden or rejected." />
         </div>
 
         <div className="toolbar">
-          <button type="button" className="button button-primary" onClick={() => void handleOverride()} disabled={!isDraftSelected || actionLoading || !detail}>
-            Submit Override
-          </button>
-          <button type="button" className="button button-secondary" onClick={() => void handleApprove()} disabled={!isDraftSelected || actionLoading || !detail}>
-            Approve Selected Plan
-          </button>
-          <button type="button" className="button button-danger" onClick={() => void handleReject()} disabled={!isDraftSelected || actionLoading || !detail}>
-            Reject Selected Plan
-          </button>
+          <button type="button" className="button button-primary" onClick={() => void handleOverride()} disabled={!isDraftSelected || actionLoading || !detail}>Submit Override</button>
+          <button type="button" className="button button-secondary" onClick={() => void handleApprove()} disabled={!isDraftSelected || actionLoading || !detail}>Approve Selected Plan</button>
+          <button type="button" className="button button-danger" onClick={() => void handleReject()} disabled={!isDraftSelected || actionLoading || !detail}>Reject Selected Plan</button>
         </div>
         {!detail ? <p className="subtle-text">Select a candidate plan before taking planner actions.</p> : null}
-        {detail && !isDraftSelected ? (
-          <p className="subtle-text">
-            Actions are disabled because plan version #{detail.version_number} is already {detail.plan_status}.
-          </p>
-        ) : null}
+        {detail && !isDraftSelected ? <p className="subtle-text">Actions are disabled because {selectedPlanLabel} is already {detail.plan_status}.</p> : null}
       </SectionCard>
     </div>
   );

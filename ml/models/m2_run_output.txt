@@ -1,0 +1,37 @@
+﻿python : Traceback (most recent 
+call last):
+At line:1 char:1
++ python ml/models/m2_model.py 
+2>&1 | Out-File -FilePath 
+ml/models/m2_r ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : Not 
+   Specified: (Traceback (most r  
+  ecent call last)::String) [],   
+  RemoteException
+    + FullyQualifiedErrorId : Nat 
+   iveCommandError
+ 
+  File "D:\Projects\pharma-availab
+ility-control-tower\ml\models\m2_m
+odel.py", line 406, in <module>
+    main()
+  File "D:\Projects\pharma-availab
+ility-control-tower\ml\models\m2_m
+odel.py", line 334, in main
+    print("\U0001f680 M2 XGBoost 
+DC Request Generator")
+  File "C:\Users\janit\AppData\Loc
+al\Programs\Python\Python311\Lib\e
+ncodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(i
+nput,self.errors,encoding_table)[0
+]
+           ^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' 
+codec can't encode character 
+'\U0001f680' in position 0: 
+character maps to <undefined>

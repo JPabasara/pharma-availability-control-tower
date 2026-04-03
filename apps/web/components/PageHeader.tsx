@@ -4,7 +4,7 @@ export function PageHeader({
   actions,
 }: {
   title: string;
-  description: string;
+  description?: string;
   actions?: React.ReactNode;
 }) {
   return (
@@ -12,7 +12,7 @@ export function PageHeader({
       <div>
         <span className="page-kicker">Planner View</span>
         <h2>{title}</h2>
-        <p>{description}</p>
+        {description ? <p>{description}</p> : null}
       </div>
       {actions ? <div className="page-actions">{actions}</div> : null}
     </section>

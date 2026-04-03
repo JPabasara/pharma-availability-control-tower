@@ -38,13 +38,33 @@ def upload_manifest(
     session: Session,
     *,
     manifest_name: str,
-    vessel_id: int,
+    vessel_id: int | None = None,
+    new_vessel_name: str | None = None,
+    new_vessel_code: str | None = None,
     csv_bytes: bytes,
     actor: str = "demo-ops",
 ) -> dict:
-    vessel = session.query(Vessel).filter(Vessel.id == vessel_id).first()
-    if not vessel:
-        return {"success": False, "message": f"Vessel {vessel_id} not found."}
+    if vessel_id:
+        vessel = session.query(Vessel).filter(Vessel.id == vessel_id).first()
+        if not vessel:
+            return {"success": False, "message": f"Vessel {vessel_id} not found."}
+    elif new_vessel_name and new_vessel_code:
+        new_vessel_code = new_vessel_code.strip().upper()
+        existing = session.query(Vessel).filter(Vessel.code == new_vessel_code).first()
+        if existing:
+            return {"success": False, "message": f"Vessel code {new_vessel_code} already exists."}
+        
+        vessel = Vessel(name=new_vessel_name.strip(), code=new_vessel_code)
+        session.add(vessel)
+        session.flush()
+        
+        vessel_id = vessel.id
+        
+        # Immediately generate an initial mock ETA so it is trackable
+        from integrations.inbound.eta_provider import provider
+        provider.refresh_eta(session, vessel.id, auto_commit=False)
+    else:
+        return {"success": False, "message": "Must provide either vessel_id or both new_vessel_name and new_vessel_code."}
 
     try:
         text = csv_bytes.decode("utf-8-sig")

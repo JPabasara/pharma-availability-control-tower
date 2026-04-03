@@ -12,9 +12,9 @@ This repository contains the current planner-facing control tower for a pharma d
    - lorry state
    - ETA snapshots
 2. **Decision engines**
-   - `M1` for shipment-SKU priority scoring
-   - `M2` for DC request generation from 48-hour forecast need
-   - `M3` for candidate dispatch planning over the next 2 planning days
+   - `M1` (Prioritizer) for shipment-level priority ranking — scores and ranks incoming manifests to help the clearance team decide which shipment to clear first when multiple arrive simultaneously
+   - `M2` (Forecaster) for DC request generation from 48-hour forecast need
+   - `M3` (Optimizer) for candidate dispatch planning over the next 2 planning days
 3. **Planner console**
    - dashboard, inputs, priorities, requests, dispatch, history, demo operations, and reports
 4. **Demo operations**
@@ -36,7 +36,7 @@ The planner is the only end user in the current version.
 - maximum 2 DC stops per run
 - one lorry can be assigned once on Day 1 and once on Day 2
 - local MySQL 8 as the default persistence layer
-- contract-compatible stub engines still supported until real `M1`, `M2`, and `M3` are plugged in
+- contract-compatible stub engines still supported until real `M1`, `M2`, and `M3` are plugged  in
 
 ## Core Rules
 
@@ -72,9 +72,9 @@ The frontend is a planner-only console with these views:
 
 - `Dashboard`
 - `Inputs`
-- `M1 Priorities`
-- `M2 Requests`
-- `M3 Dispatch`
+- `Prioritizer`
+- `Forecaster`
+- `Optimizer`
 - `History`
 - `Demo Operations`
 - `Reports`

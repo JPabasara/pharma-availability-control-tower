@@ -1,0 +1,16 @@
+sku_id,category,reefer_required,effective_stock
+SKU-005,reefer,1,1360
+SKU-006,antibiotic,0,71
+SKU-007,antiviral,0,966
+SKU-003,antiviral,0,74
+SKU-001,cardiac,0,3671
+SKU-010,reefer,1,2
+SKU-002,reefer,1,1
+SKU-011,cardiac,0,2933
+SKU-015,cardiac,0,20
+SKU-008,antiviral,0,3885
+SKU-009,antiviral,0,3404
+SKU-004,reefer,1,1582
+SKU-013,reefer,1,2547
+SKU-012,antiviral,0,1475
+SKU-014,antibiotic,0,3234
