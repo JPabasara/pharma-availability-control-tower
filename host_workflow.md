@@ -62,6 +62,7 @@ Remove-Item Env:\DATABASE_URL
 ```
 
 If you need to return the hosted demo to a clean baseline before recording or judging, reseed the environment again.
+For Phase 3 submission prep, this `db/seeds/seed_all.py` flow is the canonical way to restore the hosted demo baseline.
 
 ### 4. Deploy the frontend
 
@@ -103,6 +104,8 @@ For a stable demo:
 - seed the hosted database before recording
 - reseed again before final judging if business state has drifted
 - keep screenshots, slides, and video aligned to the same seeded scenario
+
+See [docs/submission/DATA_AND_DB_READINESS.md](docs/submission/DATA_AND_DB_READINESS.md) for the full local-versus-hosted readiness checklist and packaging rules.
 
 ## Route Naming Note
 

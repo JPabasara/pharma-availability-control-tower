@@ -48,6 +48,8 @@ This will:
 2. run Alembic migrations
 3. seed the demo data from `data/seed/`
 
+For Phase 3 submission prep, `scripts/reset_db.py` is the canonical way to restore the local demo baseline before screenshots, walkthrough validation, or recording.
+
 ## 3. Backend Terminal
 
 Start the FastAPI backend:
@@ -110,6 +112,8 @@ Run the reset script again:
 ```powershell
 .\.venv\Scripts\python scripts\reset_db.py
 ```
+
+The same reset flow is also the recommended way to recover the local competition demo baseline if planner or demo-operation actions have changed the state during preparation.
 
 ### Backend cannot connect to the database
 

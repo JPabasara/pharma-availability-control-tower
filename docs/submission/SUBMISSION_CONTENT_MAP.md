@@ -32,16 +32,30 @@ This document lists what should go into the final competition submission bundle.
 
 - `docs/submission/CODE_DOCUMENTATION.md`
 - `docs/submission/EXECUTABLE_WALKTHROUGH.md`
+- `docs/submission/DATA_AND_DB_READINESS.md`
 - `docs/submission/SUBMISSION_CONTENT_MAP.md`
 
-### Required Data And Runtime Support Files
+### Keep And Include: Data And Runtime Support Files
 
 - `data/seed/*.csv`
+- `ml/datasets/*.csv`
 - `db/migrations/**`
 - `db/seeds/seed_all.py`
 - `scripts/reset_db.py`
+- `tests/csv/test_manifest.csv`
 - `ml/models/artifacts/m2_classifier.json`
 - `ml/models/artifacts/m2_regressor.json`
+
+These files are part of the submission-ready runtime and support story. They should stay in the repository and be included in the final ZIP.
+
+### Keep In Repo But Exclude From Final ZIP
+
+- `ml/models/artifacts/m1_priority_output.csv`
+- `ml/models/artifacts/m2_requests_output.csv`
+- `ml/models/artifacts/m3_dispatch_plan.csv`
+- `ml/models/m2_run_output.txt`
+
+These files are model-side sample outputs or development-side generated evidence. They are useful to keep in the repository for reference, but they are not required for live runtime, local reset/reseed, or competition review.
 
 ### Reference Documents Kept In Repo
 
@@ -71,6 +85,10 @@ Do not include local runtime clutter or transient build output:
 - `apps/web/node_modules/`
 - `apps/web/.next/`
 - `mysql_data/`
+- `__pycache__/`
+- `build/`
+- `dist/`
+- `out/`
 - local IDE folders such as `.vscode/` or `.idea/`
 - Python cache folders
 - temporary build caches

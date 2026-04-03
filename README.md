@@ -117,6 +117,7 @@ For the competition story, the intended demo path is the ML-backed adapter flow 
 This repository should be packaged as source code plus required data and documentation. Local runtime folders such as `.git/`, `.venv/`, `apps/web/node_modules/`, `apps/web/.next/`, and other transient caches should be excluded from the final ZIP bundle.
 
 See [docs/submission/SUBMISSION_CONTENT_MAP.md](docs/submission/SUBMISSION_CONTENT_MAP.md) for the packaging checklist.
+See [docs/submission/DATA_AND_DB_READINESS.md](docs/submission/DATA_AND_DB_READINESS.md) for the canonical reset/reseed guidance used before screenshots, recording, and final submission packaging.
 
 ## Related Docs
 
@@ -126,4 +127,5 @@ See [docs/submission/SUBMISSION_CONTENT_MAP.md](docs/submission/SUBMISSION_CONTE
 - [host_workflow.md](host_workflow.md)
 - [docs/submission/CODE_DOCUMENTATION.md](docs/submission/CODE_DOCUMENTATION.md)
 - [docs/submission/EXECUTABLE_WALKTHROUGH.md](docs/submission/EXECUTABLE_WALKTHROUGH.md)
+- [docs/submission/DATA_AND_DB_READINESS.md](docs/submission/DATA_AND_DB_READINESS.md)
 - [docs/submission/SUBMISSION_CONTENT_MAP.md](docs/submission/SUBMISSION_CONTENT_MAP.md)
