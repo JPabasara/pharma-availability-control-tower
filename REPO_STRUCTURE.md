@@ -1,125 +1,110 @@
 # Repository Structure
 
-## Generated Layout
+This document reflects the cleaned, active repository layout. It is centered on the code paths that actually power the current product.
+
+## Active Layout
 
 ```text
 pharma-availability-control-tower/
-|-- README.md                   # project overview and product boundary
-|-- PROJECT_PLAN.md             # MVP delivery plan and team split
-|-- PLATFORM_DEMO_STATE_PLAN.md # detailed plan for all non-engine platform work
-|-- STRATEGY.md                 # architecture and product strategy
-|-- REPO_STRUCTURE.md           # repo map and folder responsibilities
-|-- PROGRESS.md                 # current status and frozen decisions
-|-- apps/                       # user-facing applications
-|   |-- api/                    # FastAPI backend entry point
-|   |   |-- app/                # backend application source
-|   |   |   |-- api/v1/         # versioned HTTP routes
-|   |   |   |-- orchestration/  # coordinates readers, stubs, engines, and outputs
-|   |   |   |-- planner_flow/   # approval, rejection, override, and history flow
-|   |   |   |   `-- validation/ # math-bound checker for manual overrides
-|   |   |   |-- reporting/      # report and export assembly
-|   |   |   `-- dependencies/   # shared backend wiring helpers
-|   |   `-- tests/              # backend-focused tests
-|   `-- web/                    # planner console frontend
-|       |-- app/                # frontend routes and pages
-|       |   |-- dashboard/      # summary, alerts, and pending decisions
-|       |   |-- inputs/         # read-only snapshot views
-|       |   |-- priorities/     # M1 shipment priority ranking with expandable per-SKU breakdown
-|       |   |-- requests/       # M2 request and urgency views
-|       |   |-- dispatch/       # M3 plan comparison and draft editing
-|       |   |-- history/        # approved versions and override trail
-|       |   |-- demo-state/     # reservation and simulated transfer views
-|       |   `-- reports/        # export and audit screens
-|       |-- components/         # reusable UI pieces
-|       `-- lib/                # frontend helpers and shared utilities
-|-- engines/                    # pure decision engines only
-|   |-- m1_priority/            # medicine priority scoring engine
-|   |   |-- contracts/          # M1 input and output shapes
-|   |   |-- features/           # M1 feature building logic
-|   |   |-- training/           # M1 model training pipeline
-|   |   |-- inference/          # M1 runtime scoring logic
-|   |   `-- synthetic/          # M1 synthetic data generation
-|   |-- m2_request/             # DC request generation engine
-|   |   |-- contracts/          # M2 input and output shapes
-|   |   |-- features/           # M2 feature preparation logic
-|   |   |-- forecasting/        # demand and stock-out calculations
-|   |   |-- inference/          # M2 runtime request generation
-|   |   `-- execution/          # strictly on-demand M2 execution wrappers
-|   `-- m3_dispatch/            # dispatch planning engine
-|       |-- contracts/          # M3 input and output shapes
-|       |-- optimizer/          # feasible plan generation from constraints
-|       |   |-- model/          # decision variables and constraints
-|       |   |-- solver/         # solver execution logic
-|       |   `-- serializers/    # converts solver output into plans
-|       |-- ranker/             # scores and orders candidate plans
-|       |   |-- features/       # ranker feature building
-|       |   |-- training/       # ranker training pipeline
-|       |   |-- inference/      # ranker runtime scoring
-|       |   `-- synthetic/      # synthetic plan feedback generation
-|       `-- policies/           # dispatch rules shared inside M3
-|-- demo_state/                 # demo-only stock movement simulation
-|   |-- contracts/              # demo-state input and output shapes
-|   |-- reservations/           # reservation state created on approval
-|   |-- transfers/              # simulated warehouse-to-DC transfer logic
-|   |-- arrival_simulator/      # deterministic arrival progression
-|   |-- projections/            # post-approval stock and status views
-|   `-- audit/                  # demo-state audit records
-|-- domain/                     # shared business language
-|   |-- entities/               # core business objects
-|   |-- value_objects/          # constrained reusable domain values
-|   |-- enums/                  # shared statuses and categories
-|   |-- policies/               # business rules shared across modules
-|   `-- events/                 # event names and payload concepts
-|-- integrations/               # boundaries to external and mock sources
-|   |-- inbound/                # reads inputs into the system
-|   |   |-- manifest_reader/    # fetches vessel manifest snapshots
-|   |   |-- warehouse_stock_reader/ # fetches warehouse stock snapshots
-|   |   |-- dc_stock_reader/    # fetches DC stock snapshots
-|   |   |-- sales_history_reader/ # fetches sales history snapshots
-|   |   |-- lorry_state_reader/ # fetches lorry availability snapshots
-|   |   `-- eta_provider/       # fetches vessel ETA from the mock API
-|   `-- outbound/               # publishes outputs to downstream consumers
-|       |-- approved_plan_export/ # exports approved plans
-|       `-- demo_report_export/ # exports demo-state reports
-|-- storage/                    # local persistence owned by this repo
-|   |-- snapshots/              # stored input snapshots for replay and runs
-|   |-- planner_decisions/      # approvals, rejections, and overrides
-|   |-- engine_runs/            # saved engine outputs and run metadata
-|   |-- demo_state/             # stored reservation and transfer state
-|   `-- audit/                  # cross-cutting audit records
-|-- data/                       # seed and synthetic data files
-|   |-- seed/                   # deterministic demo input data
-|   `-- synthetic/              # generated data for cold-start models
-|       |-- m1/                 # M1 synthetic scenarios
-|       `-- m3/                 # M3 synthetic plan feedback scenarios
-|-- db/                         # MySQL setup assets
-|   |-- migrations/             # schema changes for local MySQL persistence
-|   |-- seeds/                  # database seed loaders or seed SQL
-|   `-- queries/                # shared SQL queries and views
-|-- docs/                       # supporting documentation
-|   |-- uml/                    # UML diagrams
-|   |-- srs/                    # software requirement specs
-|   |-- architecture/           # architecture notes and decisions
-|   `-- demo/                   # demo script and scenario notes
-|-- scripts/                    # CLI tools for manual ops and demo simulation
-|   |-- simulate_vessel_arrival.py # physically increments WH DB stock from manifests
-|   `-- simulate_lorry_arrival.py  # physically increments DC DB stock from in-transit
-`-- tests/                      # cross-system test suites
-    |-- contract/               # interface and schema tests
-    |-- integration/            # multi-module integration tests
-    `-- e2e/                    # full planner-flow scenario tests
+|-- README.md
+|-- PROJECT_PLAN.md
+|-- REPO_STRUCTURE.md
+|-- HOW_TO_RUN.md
+|-- host_workflow.md
+|-- Dockerfile
+|-- docker-compose.yml
+|-- render.yaml
+|-- requirements.txt
+|-- alembic.ini
+|-- apps/
+|   |-- api/
+|   |   `-- app/
+|   |       |-- api/v1/              # HTTP route groups
+|   |       |-- dependencies/        # config, DB session, business time
+|   |       |-- orchestration/       # M1/M2/M3 orchestration bridge and adapters
+|   |       |   |-- real/            # ML-backed M1/M2/M3 adapters
+|   |       |   `-- stubs/           # compatibility fallback adapters
+|   |       |-- planner_flow/        # override, approve, reject, validation
+|   |       |-- demo_operations/     # hosted operational actions
+|   |       `-- input_refresh/       # input family refresh services
+|   `-- web/
+|       |-- app/                     # Next.js routes and pages
+|       |-- components/              # reusable UI components
+|       `-- lib/                     # API client, formatters, shared types
+|-- integrations/
+|   `-- inbound/                     # readers for manifests, stock, sales, ETAs, lorries
+|-- storage/
+|   |-- models/                      # SQLAlchemy models
+|   |-- snapshots/
+|   |-- planner_decisions/
+|   |-- engine_runs/
+|   |-- demo_state/
+|   `-- audit/
+|-- ml/
+|   |-- datasets/                    # synthetic dataset generation and CSVs
+|   `-- models/
+|       |-- artifacts/               # committed model outputs and model files
+|       |-- m1_model.py              # mathematical prioritization model
+|       |-- m2_model.py              # XGBoost request generator
+|       `-- m3_model.py              # OR-Tools dispatch planner
+|-- data/
+|   `-- seed/                        # deterministic business seed data
+|-- db/
+|   |-- migrations/                  # Alembic migrations
+|   `-- seeds/                       # database seed entrypoints
+|-- docs/
+|   |-- submission/                  # submission-facing documentation
+|   |-- srs/                         # preserved reference PDFs
+|   `-- uml/                         # preserved UML PDFs
+|-- scripts/
+|   |-- reset_db.py                  # drop, migrate, reseed local DB
+|   |-- drop_tables.py
+|   |-- simulate_vessel_arrival.py
+|   `-- simulate_lorry_arrival.py
+`-- tests/
+    |-- contract/
+    |-- integration/
+    |-- e2e/
+    `-- csv/
 ```
 
-## Boundary Rules
+## Runtime Boundaries
 
-- `engines/` read snapshots and emit outputs; they never own stock mutation.
-- `demo_state/` alone creates reservation state and simulates transfers for the demo.
-- `integrations/inbound/` fetches manifests, stock, sales, lorry state, and ETA into the system.
-- `apps/web/` is planner-only, and `apps/api/` orchestrates flows without containing engine logic.
-- `apps/api/` may use contract-compatible stubs until the real engines are connected.
+- `apps/api/app` owns the backend application and orchestration flow.
+- `apps/web` owns the planner-facing frontend.
+- `integrations/inbound` is responsible for reading source data into the platform.
+- `storage/models` defines the database-backed business state and audit entities.
+- `ml/models` contains the model logic and committed artifacts used by the real adapters.
+- `db/migrations` and `db/seeds` define schema and demo data setup.
 
-## Important Separation Inside M3
+## Planner Routes
 
-- `optimizer/` builds feasible dispatch plans from constraints.
-- `ranker/` scores and orders those plans for planner review.
-- Keeping them separate preserves explainability and easier debugging.
+The planner console exposes these main pages:
+
+- `/dashboard`
+- `/inputs`
+- `/requests`
+- `/priorities`
+- `/dispatch`
+- `/history`
+- `/demo-state`
+- `/reports`
+
+The `/demo-state` route is intentionally kept for compatibility, while the UI label is `Demo Operations`.
+
+## API Route Groups
+
+The backend is organized into these route families:
+
+- `/api/v1/inputs/*`
+- `/api/v1/orchestration/*`
+- `/api/v1/planner/*`
+- `/api/v1/demo-state/*`
+- `/api/v1/demo-operations/*`
+- `/api/v1/reports/*`
+- `/api/v1/mock/eta/*`
+
+## Notes On The Cleaned Repo
+
+- Placeholder-only `engines/` and `domain/` folders were removed because they were not part of the active runtime.
+- Stub bridge code remains inside `apps/api/app/orchestration/stubs` for compatibility, but the intended submission path is the ML-backed flow under `apps/api/app/orchestration/real`.

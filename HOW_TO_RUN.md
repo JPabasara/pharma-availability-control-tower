@@ -1,68 +1,131 @@
 # How To Run
 
-Run everything from the project root:
+This guide is for running the project locally from the repository root.
+
+## Prerequisites
+
+- Python environment already created at `.venv`
+- Docker Desktop
+- Node.js and npm
+- PowerShell
+
+Start from the project root:
 
 ```powershell
 cd c:\Users\jpaba\Documents\GitHub\pharma-availability-control-tower
 ```
 
-Open **3 PowerShell terminals** in that directory.
+Open three PowerShell terminals in this directory.
 
-## Terminal 1: Database
+## 1. Local Configuration
 
-Start MySQL with Docker:
+If you do not already have a working `.env`, start from `.env.example`.
+
+Local development defaults to MySQL through Docker. For the ML-backed demo path, set one of these before starting the backend:
+
+- `ENGINE_MODE=real`
+- or `M1_ENGINE_MODE=real`, `M2_ENGINE_MODE=real`, `M3_ENGINE_MODE=real`
+
+If you leave the engine mode in stub, the app still runs, but the competition demo story is written around the real adapters in `apps/api/app/orchestration/real`.
+
+## 2. Database Terminal
+
+Start MySQL:
 
 ```powershell
 docker compose up -d mysql
 ```
 
-If you want a clean seeded database before starting the app:
+If you want a clean local scenario before running the app, reset and reseed:
 
 ```powershell
 .\.venv\Scripts\python scripts\reset_db.py
 ```
 
-## Terminal 2: Backend API
+This will:
 
-Start the FastAPI server:
+1. drop all tables
+2. run Alembic migrations
+3. seed the demo data from `data/seed/`
+
+## 3. Backend Terminal
+
+Start the FastAPI backend:
 
 ```powershell
 .\.venv\Scripts\python -m uvicorn apps.api.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-## Terminal 3: Frontend
+Useful local backend URL:
 
-First time only, install frontend dependencies:
+- API root: `http://127.0.0.1:8000/`
+- API docs: `http://127.0.0.1:8000/docs`
+
+## 4. Frontend Terminal
+
+Install frontend dependencies the first time only:
 
 ```powershell
 npm --prefix apps/web install
 ```
 
-Then start the Next.js app:
+Then start the frontend:
 
 ```powershell
 $env:NEXT_PUBLIC_API_BASE_URL='http://127.0.0.1:8000'
 npm --prefix apps/web run dev
 ```
 
-## Open In Browser
+Useful local frontend URL:
 
-- Frontend: `http://127.0.0.1:3000/dashboard`
-- API docs: `http://127.0.0.1:8000/docs`
+- Planner console: `http://127.0.0.1:3000/dashboard`
 
-## Important Note
+## 5. Quick Verification
 
-The frontend should run on **port 3000**.
+After all three services are up:
 
-If Next.js starts on `3001` instead, the backend CORS config may block requests. In that case:
+1. open `/dashboard`
+2. confirm the planner shell loads
+3. open `/inputs` and verify the seeded input families appear
+4. open `/dispatch` and confirm the Optimizer workspace loads
+5. open `/demo-state` and confirm Demo Operations loads
 
-- stop the frontend
-- free port `3000`
-- start the frontend again
+Optional non-mutating checks:
+
+```powershell
+.\.venv\Scripts\python -m unittest tests.integration.test_singleton_live_planning
+npm --prefix apps/web run build
+```
+
+## Troubleshooting
+
+### Frontend starts on the wrong port
+
+The frontend should run on port `3000`. If Next.js starts on a different port, stop it, free port `3000`, and start it again.
+
+### Local data looks inconsistent
+
+Run the reset script again:
+
+```powershell
+.\.venv\Scripts\python scripts\reset_db.py
+```
+
+### Backend cannot connect to the database
+
+Check:
+
+- Docker MySQL is running
+- your `.env` points to the expected local database
+- port `3307` is available locally
+
+### Real adapters are not being used
+
+Check your backend environment variables and confirm either `ENGINE_MODE=real` or all three per-engine flags are set to `real`.
 
 ## Stop Everything
 
-Stop Docker MySQL when you are done:
+When you are done:
 
 ```powershell
 docker compose down
