@@ -30,7 +30,7 @@ function RequestsPageContent() {
       const response = await getCurrentM2Requests();
       setData(response);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load M2 requests.");
+      setError(cause instanceof Error ? cause.message : "Unable to load Forecaster requests.");
     } finally {
       setLoading(false);
     }
@@ -46,14 +46,14 @@ function RequestsPageContent() {
     try {
       await refreshM2();
       await loadCurrent();
-      setNotice({ tone: "success", message: "M2 was refreshed successfully." });
+      setNotice({ tone: "success", message: "Forecaster was refreshed successfully." });
     } catch (cause) {
       const message =
         cause instanceof ApiError
           ? cause.message
           : cause instanceof Error
             ? cause.message
-            : "Unable to refresh M2.";
+            : "Unable to refresh Forecaster.";
       setNotice({ tone: "error", message });
     } finally {
       setActionLoading(false);
@@ -93,7 +93,7 @@ function RequestsPageContent() {
               onClick={() => void handleRefresh()}
               disabled={loading || actionLoading}
             >
-              {actionLoading ? "..." : "Refresh M2"}
+              {actionLoading ? "..." : "Refresh Forecaster"}
             </button>
             <Link href="/dispatch" className="button button-secondary">
               Back to Dispatch
@@ -102,7 +102,7 @@ function RequestsPageContent() {
         }
       />
 
-      {loading ? <LoadingPanel label="Loading M2 requests..." /> : null}
+      {loading ? <LoadingPanel label="Loading Forecaster requests..." /> : null}
       {error ? <div className="notice notice-error"><p>{error}</p></div> : null}
       {notice ? (
         <div className={`notice notice-${notice.tone}`}>
@@ -112,8 +112,8 @@ function RequestsPageContent() {
 
       {!loading && !data?.available ? (
         <EmptyState
-          title="No live M2 snapshot yet"
-          description="Use Refresh M2 to regenerate the latest replenishment requests for the DC network."
+          title="No live Forecaster snapshot yet"
+          description="Use Refresh Forecaster to regenerate the latest replenishment requests for the DC network."
           actionHref="/dispatch"
           actionLabel="Open Dispatch"
         />
@@ -147,7 +147,7 @@ function RequestsPageContent() {
             <MetricCard
               label="Requested Units"
               value={formatInteger(totalRequestedUnits)}
-              detail="Total requested quantity across the latest M2 snapshot."
+              detail="Total requested quantity across the latest Forecaster snapshot."
               accent="amber"
             />
           </div>
@@ -170,7 +170,7 @@ function RequestsPageContent() {
 
           <SectionCard
             title="Request Lines"
-            description="All replenishment requests produced by the latest M2 snapshot."
+            description="All replenishment requests produced by the latest Forecaster snapshot."
           >
             <DataTable
               columns={[
@@ -192,7 +192,7 @@ function RequestsPageContent() {
 
 export default function RequestsPage() {
   return (
-    <Suspense fallback={<LoadingPanel label="Loading M2 requests..." />}>
+    <Suspense fallback={<LoadingPanel label="Loading Forecaster requests..." />}>
       <RequestsPageContent />
     </Suspense>
   );

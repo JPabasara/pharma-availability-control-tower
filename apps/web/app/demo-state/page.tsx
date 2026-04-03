@@ -552,7 +552,7 @@ export default function DemoStatePage() {
       ) : null}
 
       {workspace === "dc" ? (
-        <SectionCard title="DC Control" description="Post current-time DC sales to reduce physical stock and extend the 30-day sales history used by M2.">
+        <SectionCard title="DC Control" description="Post current-time DC sales to reduce physical stock and extend the 30-day sales history used by Forecaster.">
           <div className="two-up-grid">
             <div className="operation-panel">
               <div className="field-grid">
