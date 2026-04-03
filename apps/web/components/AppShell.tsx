@@ -11,9 +11,11 @@ import {
   Database, 
   FileText, 
   LayoutDashboard, 
+  Menu,
   Moon, 
   Sun,
-  Truck
+  Truck,
+  X
 } from "lucide-react";
 
 import { buildQueryString } from "@/lib/format";
@@ -25,7 +27,7 @@ import { AlertCircle } from "lucide-react";
 type NavItem = {
   href: string;
   label: string;
-  icon: any; // Using any for simplicity with lucide icons, or React.ElementType
+  icon: any;
   useRunContext?: boolean;
 };
 
@@ -46,9 +48,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
   
   const [time, setTime] = useState("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Client-side only time to avoid hydration mismatch
     setTime(new Date().toLocaleTimeString());
     const timer = setInterval(() => {
       setTime(new Date().toLocaleTimeString());
@@ -56,9 +58,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => clearInterval(timer);
   }, []);
 
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
   return (
     <div className="shell">
-      <aside className="sidebar">
+      {/* Mobile backdrop overlay */}
+      <div
+        className={`sidebar-overlay${isMobileMenuOpen ? " active" : ""}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+        aria-hidden="true"
+      />
+
+      <aside className={`sidebar${isMobileMenuOpen ? " open" : ""}`}>
         <div className="sidebar-brand">
           <div className="brand-icon">
             <Activity size={20} />
@@ -67,6 +81,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="sidebar-eyebrow">Planner Console</span>
             <h1>Pharma Tower</h1>
           </div>
+          {/* Close button — visible only on mobile */}
+          <button
+            className="mobile-close"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-label="Close navigation"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <div className="nav-section-title">Menu</div>
@@ -101,6 +123,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="main-wrapper">
         <header className="top-header">
+          {/* Hamburger — visible only on mobile */}
+          <button
+            className="mobile-toggle"
+            onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="Open navigation menu"
+          >
+            <Menu size={22} />
+          </button>
+
           <div className="live-clock">
             <Clock size={16} />
             {time || "--:--:--"}
