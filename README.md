@@ -12,7 +12,7 @@ This repository contains the current planner-facing control tower for a pharma d
    - lorry state
    - ETA snapshots
 2. **Decision engines**
-   - `M1` (Prioritizer) for shipment-SKU priority scoring
+   - `M1` (Prioritizer) for shipment-level priority ranking — scores and ranks incoming manifests to help the clearance team decide which shipment to clear first when multiple arrive simultaneously
    - `M2` (Forecaster) for DC request generation from 48-hour forecast need
    - `M3` (Optimizer) for candidate dispatch planning over the next 2 planning days
 3. **Planner console**

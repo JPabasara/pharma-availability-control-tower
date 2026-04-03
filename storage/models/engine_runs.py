@@ -104,6 +104,7 @@ class M1Result(Base, IdMixin, TimestampMixin):
     )
 
     sku: Mapped["SKU"] = relationship("SKU")
+    manifest_line: Mapped["ManifestLine"] = relationship("ManifestLine")
 
     __table_args__ = (
         Index("ix_m1_result_run", "engine_run_id"),

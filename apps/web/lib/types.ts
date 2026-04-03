@@ -184,26 +184,30 @@ export type EngineRunsResponse = {
   count: number;
 };
 
-export type M1LineResult = {
+export type M1ShipmentLine = {
   id: number;
   manifest_line_id: number;
   sku_id: number;
   sku_code: string;
   sku_name: string;
+  quantity: number;
   priority_score: number;
   priority_band: "critical" | "high" | "medium" | "low";
   reefer_required: boolean;
 };
 
-export type M1SkuSummary = {
-  sku_id: number;
-  sku_code: string;
-  sku_name: string;
-  reefer_required: boolean;
-  avg_score: number;
-  max_score: number;
-  line_count: number;
-  highest_band: "critical" | "high" | "medium" | "low";
+export type M1ShipmentSummary = {
+  rank: number;
+  manifest_snapshot_id: number;
+  manifest_name: string;
+  vessel_name: string;
+  vessel_code: string;
+  shipment_score: number;
+  shipment_band: "critical" | "high" | "medium" | "low";
+  has_cold_chain: boolean;
+  total_quantity: number;
+  sku_count: number;
+  lines: M1ShipmentLine[];
 };
 
 export type M1ResultsResponse = {
@@ -212,9 +216,9 @@ export type M1ResultsResponse = {
   status: string;
   generated_at?: string | null;
   planning_start_date?: string | null;
-  line_results: M1LineResult[];
-  sku_summary: M1SkuSummary[];
+  total_shipments: number;
   total_lines: number;
+  shipments: M1ShipmentSummary[];
 };
 
 export type M2Request = {

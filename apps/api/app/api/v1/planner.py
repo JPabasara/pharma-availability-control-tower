@@ -18,6 +18,8 @@ from storage.models import (
     M3PlanRun,
     M3PlanStop,
     M3PlanVersion,
+    ManifestLine,
+    ManifestSnapshot,
     SKU,
 )
 
@@ -52,58 +54,98 @@ class OverrideRequest(BaseModel):
     override_by: str = "planner"
 
 
+def _score_to_band(score: float) -> str:
+    """Derive a priority band from a numeric score using the same thresholds as the engine."""
+    if score >= 75:
+        return "critical"
+    if score >= 50:
+        return "high"
+    if score >= 25:
+        return "medium"
+    return "low"
+
+
 def _serialize_m1_results(run: EngineRun | None, results: list[M1Result]) -> dict:
-    line_results = []
-    sku_agg: dict[int, dict] = {}
+    """Group M1 line-level results into shipment-level priority ranking.
+
+    Each shipment gets:
+      - shipment_score: quantity-weighted average of line scores
+      - shipment_band: derived from the computed shipment score
+      - has_cold_chain: True if any line requires reefer
+      - lines: per-SKU breakdown with individual scores, quantities, and cold chain flag
+    """
+    # Group results by manifest_snapshot_id (shipment)
+    shipment_map: dict[int, dict] = {}
 
     for result in results:
         sku = result.sku
-        if not sku:
-            sku = None
+        ml = result.manifest_line
+        snapshot = ml.snapshot if ml else None
+        vessel = snapshot.vessel if snapshot else None
+        snap_id = ml.manifest_snapshot_id if ml else 0
+        quantity = ml.quantity if ml else 0
 
-        line_results.append(
+        if snap_id not in shipment_map:
+            shipment_map[snap_id] = {
+                "manifest_snapshot_id": snap_id,
+                "manifest_name": snapshot.manifest_name if snapshot else "Unknown",
+                "vessel_name": vessel.name if vessel else "Unknown",
+                "vessel_code": vessel.code if vessel else "UNKNOWN",
+                "lines": [],
+                "_weighted_scores": [],  # (score * quantity) accumulator
+                "_total_qty": 0,
+                "_has_cold_chain": False,
+            }
+
+        entry = shipment_map[snap_id]
+        entry["lines"].append(
             {
                 "id": result.id,
                 "manifest_line_id": result.manifest_line_id,
                 "sku_id": result.sku_id,
                 "sku_code": sku.code if sku else "UNKNOWN",
                 "sku_name": sku.name if sku else "Unknown",
+                "quantity": quantity,
                 "priority_score": result.priority_score,
                 "priority_band": result.priority_band,
                 "reefer_required": result.reefer_required,
             }
         )
+        entry["_weighted_scores"].append(result.priority_score * quantity)
+        entry["_total_qty"] += quantity
+        if result.reefer_required:
+            entry["_has_cold_chain"] = True
 
-        summary = sku_agg.setdefault(
-            result.sku_id,
-            {
-                "sku_id": result.sku_id,
-                "sku_code": sku.code if sku else "UNKNOWN",
-                "sku_name": sku.name if sku else "Unknown",
-                "reefer_required": result.reefer_required,
-                "scores": [],
-                "bands": [],
-            },
+    # Build final shipment list with computed scores
+    shipments = []
+    for data in shipment_map.values():
+        total_qty = data["_total_qty"]
+        shipment_score = (
+            round(sum(data["_weighted_scores"]) / total_qty, 2) if total_qty > 0 else 0.0
         )
-        summary["scores"].append(result.priority_score)
-        summary["bands"].append(result.priority_band)
-
-    sku_summary = []
-    band_priority = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    for data in sku_agg.values():
-        highest_band = min(data["bands"], key=lambda band: band_priority.get(band, 99))
-        sku_summary.append(
+        # Sort lines within each shipment by score desc
+        sorted_lines = sorted(data["lines"], key=lambda ln: ln["priority_score"], reverse=True)
+        shipments.append(
             {
-                "sku_id": data["sku_id"],
-                "sku_code": data["sku_code"],
-                "sku_name": data["sku_name"],
-                "reefer_required": data["reefer_required"],
-                "avg_score": round(sum(data["scores"]) / len(data["scores"]), 2),
-                "max_score": max(data["scores"]),
-                "line_count": len(data["scores"]),
-                "highest_band": highest_band,
+                "manifest_snapshot_id": data["manifest_snapshot_id"],
+                "manifest_name": data["manifest_name"],
+                "vessel_name": data["vessel_name"],
+                "vessel_code": data["vessel_code"],
+                "shipment_score": shipment_score,
+                "shipment_band": _score_to_band(shipment_score),
+                "has_cold_chain": data["_has_cold_chain"],
+                "total_quantity": total_qty,
+                "sku_count": len(data["lines"]),
+                "lines": sorted_lines,
             }
         )
+
+    # Sort shipments by score descending, assign ranks
+    shipments.sort(key=lambda s: s["shipment_score"], reverse=True)
+    for idx, shipment in enumerate(shipments, start=1):
+        shipment["rank"] = idx
+
+    total_lines = sum(len(s["lines"]) for s in shipments)
 
     return {
         "available": run is not None,
@@ -111,9 +153,9 @@ def _serialize_m1_results(run: EngineRun | None, results: list[M1Result]) -> dic
         "status": run.status if run else "not_started",
         "generated_at": orchestration_service.get_generated_at_iso(run),
         "planning_start_date": run.planning_start_date.isoformat() if run and run.planning_start_date else None,
-        "line_results": line_results,
-        "sku_summary": sorted(sku_summary, key=lambda item: item["max_score"], reverse=True),
-        "total_lines": len(line_results),
+        "total_shipments": len(shipments),
+        "total_lines": total_lines,
+        "shipments": shipments,
     }
 
 
@@ -267,7 +309,12 @@ def get_current_m1_results(db: Session = Depends(get_db)):
 
     results = (
         db.query(M1Result)
-        .options(joinedload(M1Result.sku))
+        .options(
+            joinedload(M1Result.sku),
+            joinedload(M1Result.manifest_line)
+            .joinedload(ManifestLine.snapshot)
+            .joinedload(ManifestSnapshot.vessel),
+        )
         .filter(M1Result.engine_run_id == run.id)
         .order_by(M1Result.priority_score.desc(), M1Result.id.asc())
         .all()
@@ -343,7 +390,12 @@ def get_m1_results(run_id: int, db: Session = Depends(get_db)):
 
     results = (
         db.query(M1Result)
-        .options(joinedload(M1Result.sku))
+        .options(
+            joinedload(M1Result.sku),
+            joinedload(M1Result.manifest_line)
+            .joinedload(ManifestLine.snapshot)
+            .joinedload(ManifestSnapshot.vessel),
+        )
         .filter(M1Result.engine_run_id == run_id)
         .order_by(M1Result.priority_score.desc(), M1Result.id.asc())
         .all()

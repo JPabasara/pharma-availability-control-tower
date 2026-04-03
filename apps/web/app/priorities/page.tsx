@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { ApiError, getCurrentM1Results, refreshM1 } from "@/lib/api";
 import { formatDate, formatDateTime, formatInteger, formatNumber } from "@/lib/format";
-import type { M1ResultsResponse } from "@/lib/types";
+import type { M1ResultsResponse, M1ShipmentSummary } from "@/lib/types";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingPanel } from "@/components/LoadingPanel";
@@ -22,6 +22,7 @@ function PrioritiesPageContent() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [expandedShipments, setExpandedShipments] = useState<Set<number>>(new Set());
 
   async function loadCurrent() {
     setLoading(true);
@@ -60,21 +61,43 @@ function PrioritiesPageContent() {
     }
   }
 
-  const criticalLines = useMemo(
-    () => data?.line_results.filter((line) => line.priority_band === "critical").length ?? 0,
+  function toggleShipment(snapId: number) {
+    setExpandedShipments((prev) => {
+      const next = new Set(prev);
+      if (next.has(snapId)) {
+        next.delete(snapId);
+      } else {
+        next.add(snapId);
+      }
+      return next;
+    });
+  }
+
+  function expandAll() {
+    if (data?.shipments) {
+      setExpandedShipments(new Set(data.shipments.map((s) => s.manifest_snapshot_id)));
+    }
+  }
+
+  function collapseAll() {
+    setExpandedShipments(new Set());
+  }
+
+  const criticalShipments = useMemo(
+    () => data?.shipments.filter((s) => s.shipment_band === "critical").length ?? 0,
     [data]
   );
-  const reeferLines = useMemo(
-    () => data?.line_results.filter((line) => line.reefer_required).length ?? 0,
+  const coldChainShipments = useMemo(
+    () => data?.shipments.filter((s) => s.has_cold_chain).length ?? 0,
     [data]
   );
-  const topScore = useMemo(() => data?.line_results[0]?.priority_score ?? 0, [data]);
+  const topScore = useMemo(() => data?.shipments[0]?.shipment_score ?? 0, [data]);
 
   return (
     <div className="page-stack">
       <PageHeader
         title="Prioritizer"
-        description="Shipment-line priority scores and the aggregated SKU view for planner review."
+        description="Shipment-level priority ranking for clearance team review. Expand each shipment to see per-SKU breakdown."
         actions={
           <div className="page-actions">
             <button
@@ -123,70 +146,108 @@ function PrioritiesPageContent() {
               accent="ink"
             />
             <MetricCard
-              label="Line Results"
-              value={formatInteger(data.total_lines)}
-              detail="Manifest lines scored by the latest M1 run."
+              label="Total Shipments"
+              value={formatInteger(data.total_shipments)}
+              detail={`${formatInteger(data.total_lines)} manifest lines across all shipments.`}
               accent="teal"
             />
             <MetricCard
-              label="Critical Lines"
-              value={formatInteger(criticalLines)}
-              detail="Highest urgency lines requiring planner attention first."
+              label="Critical Shipments"
+              value={formatInteger(criticalShipments)}
+              detail="Shipments with critical priority requiring immediate clearance."
               accent="rose"
             />
             <MetricCard
               label="Top Score"
               value={formatNumber(topScore)}
-              detail={`${formatInteger(reeferLines)} reefer-sensitive lines are in this snapshot.`}
+              detail={`${formatInteger(coldChainShipments)} shipment(s) contain cold chain items.`}
               accent="amber"
             />
           </div>
 
           <SectionCard
-            title="Aggregated SKU Summary"
-            description="Highest band and score distribution collapsed to the SKU level."
+            title="Shipment Priority Ranking"
+            description="Ranked list of incoming shipments — clear the top-ranked shipment first."
           >
-            <DataTable
-              columns={[
-                { key: "sku", header: "SKU", render: (row) => `${row.sku_code} - ${row.sku_name}` },
-                { key: "band", header: "Highest Band", render: (row) => <StatusPill value={row.highest_band} /> },
-                { key: "max", header: "Max Score", render: (row) => formatNumber(row.max_score) },
-                { key: "avg", header: "Average Score", render: (row) => formatNumber(row.avg_score) },
-                { key: "lines", header: "Lines", render: (row) => formatInteger(row.line_count) },
-                {
-                  key: "reefer",
-                  header: "Cold Chain",
-                  render: (row) =>
-                    row.reefer_required ? <StatusPill value="reefer" tone="info" /> : "Normal",
-                },
-              ]}
-              rows={data.sku_summary}
-              getRowKey={(row) => row.sku_id}
-            />
-          </SectionCard>
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              <button type="button" className="button button-secondary" style={{ fontSize: "0.8rem", padding: "0.3rem 0.7rem" }} onClick={expandAll}>
+                Expand All
+              </button>
+              <button type="button" className="button button-secondary" style={{ fontSize: "0.8rem", padding: "0.3rem 0.7rem" }} onClick={collapseAll}>
+                Collapse All
+              </button>
+            </div>
 
-          <SectionCard
-            title="Line-Level Results"
-            description="The planner-facing view of every manifest line scored by the latest M1 snapshot."
-          >
-            <DataTable
-              columns={[
-                { key: "manifest", header: "Manifest Line", render: (row) => `#${row.manifest_line_id}` },
-                { key: "sku", header: "SKU", render: (row) => `${row.sku_code} - ${row.sku_name}` },
-                { key: "score", header: "Score", render: (row) => formatNumber(row.priority_score) },
-                { key: "band", header: "Band", render: (row) => <StatusPill value={row.priority_band} /> },
-                {
-                  key: "reefer",
-                  header: "Cold Chain",
-                  render: (row) =>
-                    row.reefer_required ? <StatusPill value="reefer" tone="info" /> : "Normal",
-                },
-              ]}
-              rows={data.line_results}
-              getRowKey={(row) => row.id}
-            />
+            <div className="shipment-ranking-list">
+              {data.shipments.map((shipment) => (
+                <ShipmentRow
+                  key={shipment.manifest_snapshot_id}
+                  shipment={shipment}
+                  expanded={expandedShipments.has(shipment.manifest_snapshot_id)}
+                  onToggle={() => toggleShipment(shipment.manifest_snapshot_id)}
+                />
+              ))}
+            </div>
           </SectionCard>
         </>
+      ) : null}
+    </div>
+  );
+}
+
+function ShipmentRow({
+  shipment,
+  expanded,
+  onToggle,
+}: {
+  shipment: M1ShipmentSummary;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="shipment-card">
+      <button
+        type="button"
+        className="shipment-header"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        <div className="shipment-rank">#{shipment.rank}</div>
+        <div className="shipment-meta">
+          <span className="shipment-name">{shipment.manifest_name}</span>
+          <span className="shipment-vessel">{shipment.vessel_name} ({shipment.vessel_code})</span>
+        </div>
+        <div className="shipment-stats">
+          <StatusPill value={shipment.shipment_band} />
+          <span className="shipment-score">{formatNumber(shipment.shipment_score)}</span>
+          <span className="shipment-skus">{shipment.sku_count} SKUs</span>
+          <span className="shipment-qty">{formatInteger(shipment.total_quantity)} units</span>
+          {shipment.has_cold_chain ? (
+            <StatusPill value="cold chain" tone="info" />
+          ) : null}
+        </div>
+        <span className="shipment-chevron">{expanded ? "▼" : "▶"}</span>
+      </button>
+
+      {expanded ? (
+        <div className="shipment-detail">
+          <DataTable
+            columns={[
+              { key: "sku", header: "SKU", render: (row) => `${row.sku_code} — ${row.sku_name}` },
+              { key: "quantity", header: "Quantity", render: (row) => formatInteger(row.quantity) },
+              { key: "score", header: "Score", render: (row) => formatNumber(row.priority_score) },
+              { key: "band", header: "Band", render: (row) => <StatusPill value={row.priority_band} /> },
+              {
+                key: "reefer",
+                header: "Cold Chain",
+                render: (row) =>
+                  row.reefer_required ? <StatusPill value="reefer" tone="info" /> : "Normal",
+              },
+            ]}
+            rows={shipment.lines}
+            getRowKey={(row) => row.id}
+          />
+        </div>
       ) : null}
     </div>
   );
