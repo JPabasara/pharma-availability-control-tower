@@ -555,12 +555,13 @@ function DispatchPageContent() {
         </div>
 
         <div className="toolbar">
-          <button type="button" className="button button-primary" onClick={() => void handleOverride()} disabled={!isDraftSelected || actionLoading || !detail}>Submit Override</button>
-          <button type="button" className="button button-secondary" onClick={() => void handleApprove()} disabled={!isDraftSelected || actionLoading || !detail}>Approve Selected Plan</button>
-          <button type="button" className="button button-danger" onClick={() => void handleReject()} disabled={!isDraftSelected || actionLoading || !detail}>Reject Selected Plan</button>
+          <button type="button" className="button button-primary" onClick={() => void handleOverride()} disabled={!isDraftSelected || actionLoading || !detail || m3Locked}>Submit Override</button>
+          <button type="button" className="button button-secondary" onClick={() => void handleApprove()} disabled={!isDraftSelected || actionLoading || !detail || m3Locked}>Approve Selected Plan</button>
+          <button type="button" className="button button-danger" onClick={() => void handleReject()} disabled={!isDraftSelected || actionLoading || !detail || m3Locked}>Reject Selected Plan</button>
         </div>
         {!detail ? <p className="subtle-text">Select a candidate plan before taking planner actions.</p> : null}
-        {detail && !isDraftSelected ? <p className="subtle-text">Actions are disabled because {selectedPlanLabel} is already {detail.plan_status}.</p> : null}
+        {m3Locked ? <p className="subtle-text">Actions are disabled because the dispatch horizon is locked.</p> : null}
+        {detail && !isDraftSelected && !m3Locked ? <p className="subtle-text">Actions are disabled because {selectedPlanLabel} is already {detail.plan_status}.</p> : null}
       </SectionCard>
     </div>
   );
