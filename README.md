@@ -4,6 +4,11 @@ Pharma Availability Control Tower is a planner-facing control tower for pharma r
 
 The current repository is a working MVP and competition submission codebase, not a future architecture draft. The implemented product includes a FastAPI backend, a Next.js planner console, database-backed state and audit trails, seeded demo data, and ML-backed `M1`, `M2`, and `M3` adapters under `apps/api/app/orchestration/real`.
 
+## Dashboard Screenshot
+
+![Dashboard screenshot](docs/submission/screenshots/dashboard.png)
+
+
 ## Problem
 
 Pharma distribution planning gets difficult when multiple operational pressures overlap:
@@ -67,7 +72,20 @@ The implemented planner console includes these views:
 - `Demo Operations`
 - `Reports`
 
-The UI label is `Demo Operations`. For route compatibility, the frontend route remains `/demo-state`.
+### Forecaster
+![Forecaster](docs/submission/screenshots/forecaster.png)
+
+### Priotizer
+![Priotizer](docs/submission/screenshots/priotizer.png)
+
+### Optimizer
+![Optimizer](docs/submission/screenshots/optimizer.png)
+
+The UI label is `Demo Operations`. For route compatibility, the frontend route remains `/
+demo-state`.
+
+### Demo Operations
+![Demo Operations](docs/submission/screenshots/demo_operations.png)
 
 ## Runtime Architecture
 
