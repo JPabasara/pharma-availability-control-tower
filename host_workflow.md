@@ -1,80 +1,112 @@
-# Hosting Workflow: Neon (DB) + Render (API) + Vercel (Web)
+# Hosted Demo Workflow
 
-We are hosting the backend API on **Render**, which automatically detects and builds our `Dockerfile` and easily integrates the necessary configuration environment variables.
+This document describes the hosted-first path for the competition demo and reviewer access.
 
-## Phase 1: Create the Database on Neon
-1. Go to [Neon.tech](https://neon.tech/) and log in with GitHub. *(Neon is true free-tier serverless Postgres)*.
-2. Click **Create Project**.
-3. Fill in your project details:
-   - **Name**: `pharma-control-tower-db`
-   - **Version**: Postgres 17
-   - **Region**: **Singapore (ap-southeast-1)** *(Crucial for low latency!)*
-4. Click **Create Project**.
-5. Once created, copy the **Connection String** (`postgresql://...`). Keep this safe.
+## Target Hosted Architecture
 
-## Phase 2: Render Web Service (Backend)
-Render is an excellent host that automatically builds from our `Dockerfile`. Since your Neon Database is in Singapore, you should configure your Render Web Service to also run in the Singapore region (if available on the tier) for zero latency.
+The intended hosted setup is:
 
-1. Go to the [Render Dashboard](https://dashboard.render.com/) and click **New+** > **Web Service**.
-2. Connect your GitHub repository: `pharma-availability-control-tower`.
-3. In the configuration:
-   - **Name**: `pharma-control-api`
-   - **Region**: `Singapore (ap-southeast-1)` (If unavailable on Free Tier, use closest possible or upgrade).
-   - **Branch**: `main`
-   - **Runtime**: `Docker` (Render automatically detects the Dockerfile in the repo).
-   - **Instance Type**: Select the Free tier (or appropriate upgraded tier).
-4. Scroll down to **Environment Variables** and add these exactly 5 variables:
-   - `DATABASE_URL`: **Paste your Neon Postgres Connection String exactly.**
-   - `ENGINE_MODE`: `real` *(We are now running the real engines)*
-   - `BUSINESS_TIMEZONE`: `Asia/Colombo`
-   - `ALLOWED_ORIGINS`: `*` *(We'll keep CORS open for the very first deployment)*
-   - `PYTHON_VERSION`: `3.12.0` *(Sometimes required by Render just to be safe)*
-5. Click **Deploy Web Service**. Render will securely build your Docker container. Wait until it shows the Green "Live" status, and copy the domain link (e.g., `https://pharma-...onrender.com`).
+- frontend on Vercel
+- backend API on Render
+- managed database provided through `DATABASE_URL`
 
-## Phase 3: Fresh Database Initialization & Seeding
-If you are deploying for the first time, or if you need to wipe your database and start fresh with new demo data, follow these steps locally:
+Local development still uses Docker MySQL, but the hosted deployment should be treated as the primary review path.
 
-1. Copy your Neon **Connection String** again.
-2. Open PowerShell locally in your project folder.
-3. Set your local environment variable:
-   ```powershell
-   $env:DATABASE_URL="<your-neon-database-url>"
-   ```
-4. **Important for starting fresh:** Wipe the existing schema and rebuild it to ensure a clean slate:
-   ```powershell
-   .\.venv\Scripts\alembic downgrade base
-   .\.venv\Scripts\alembic upgrade head
-   ```
-5. Run the seed script to populate the database:
-   ```powershell
-   .\.venv\Scripts\python db\seeds\seed_all.py
-   ```
-6. Once it finishes successfully, securely remove the local environment variable:
-   ```powershell
-   Remove-Item Env:\DATABASE_URL
-   ```
+## Backend Environment Variables
 
-## Phase 4: Vercel Frontend
-1. Go to [Vercel](https://vercel.com/new) and click **Add New Project**.
-2. Import the exact same GitHub repository.
-3. **Crucial**: Set the **Root Directory** to `apps/web`. Vercel automatically configures itself for Next.js.
-4. Open the **Environment Variables** panel and add:
-   - `NEXT_PUBLIC_API_BASE_URL`: **Paste the Render API Domain you noted in Phase 2**. Make sure you do NOT leave a trailing slash `/` at the end of the URL.
-5. Click **Deploy**. Vercel will build and launch your frontend.
-6. Once live, note the Vercel Production Domain (e.g., `https://pharma-availability-control-tower.vercel.app`).
+Set these on the hosted backend:
 
-## Phase 5: Finalizing CORS Security (Optional)
-If you want to lock down the backend so only your Vercel site can query it, you have two options in your Render **Environment** settings:
+- `DATABASE_URL`
+- `BUSINESS_TIMEZONE=Asia/Colombo`
+- `ALLOWED_ORIGINS=<your frontend domain>` or `ALLOW_ORIGIN_REGEX=<your preview-domain regex>`
+- `ENGINE_MODE=real`
 
-**Option A (Strict - Production Only):**
-Edit `ALLOWED_ORIGINS` to perfectly match your new Vercel domain:
-- `https://pharma-availability-control-tower.vercel.app`
+Alternative engine configuration is also supported:
 
-**Option B (Flexible - Recommended by your friend):**
-If you use Vercel's "Preview Deployments" (where every branch gets a random URL like `https://app-xyz123.vercel.app`), an exact match will break. Instead, delete `ALLOWED_ORIGINS` and add a new variable:
-- `ALLOW_ORIGIN_REGEX`: `https://.*\.vercel\.app`
-This regex securely tells the backend to accept requests from *any* Vercel domain.
+- `M1_ENGINE_MODE=real`
+- `M2_ENGINE_MODE=real`
+- `M3_ENGINE_MODE=real`
 
-3. Save changes. Render will auto-deploy the update, strictly locking access to Vercel.
+Use the per-engine flags only if you need split control. For the competition demo, a single `ENGINE_MODE=real` is simpler.
 
-**Done!** Your backend API is securely hosted on Render, your Database runs independently on Neon, and your Front-end connects flawlessly through Vercel.
+## Frontend Environment Variables
+
+Set this on the hosted frontend:
+
+- `NEXT_PUBLIC_API_BASE_URL=<your hosted backend URL>`
+
+Do not include a trailing slash.
+
+## Deployment Sequence
+
+### 1. Provision the hosted database
+
+Create the managed database and copy the connection string into `DATABASE_URL`.
+
+### 2. Deploy the backend
+
+Deploy the backend from this repository using the existing Render configuration as the baseline. Confirm:
+
+- the service boots successfully
+- migrations run successfully
+- the health endpoint returns `ok`
+
+### 3. Seed the hosted database
+
+After migrations succeed, seed the hosted database from a trusted environment:
+
+```powershell
+$env:DATABASE_URL="<your hosted database url>"
+.\.venv\Scripts\python db\seeds\seed_all.py
+Remove-Item Env:\DATABASE_URL
+```
+
+If you need to return the hosted demo to a clean baseline before recording or judging, reseed the environment again.
+For Phase 3 submission prep, this `db/seeds/seed_all.py` flow is the canonical way to restore the hosted demo baseline.
+
+### 4. Deploy the frontend
+
+Deploy `apps/web` to Vercel and point it to the hosted backend through `NEXT_PUBLIC_API_BASE_URL`.
+
+### 5. Run a hosted smoke check
+
+Confirm these routes load correctly:
+
+- `/dashboard`
+- `/inputs`
+- `/requests`
+- `/priorities`
+- `/dispatch`
+- `/demo-state`
+- `/history`
+- `/reports`
+
+## Reviewer And Judge Flow
+
+The hosted reviewer experience should start from the frontend URL, not raw API docs.
+
+Recommended path:
+
+1. open the hosted frontend on `/dashboard`
+2. review `/inputs`
+3. review `/requests`
+4. review `/priorities`
+5. review `/dispatch`
+6. review `/demo-state`
+7. finish on `/history` or `/reports`
+
+Use [docs/submission/EXECUTABLE_WALKTHROUGH.md](docs/submission/EXECUTABLE_WALKTHROUGH.md) as the reviewer script.
+
+## Reset And Seeding Expectations
+
+For a stable demo:
+
+- seed the hosted database before recording
+- reseed again before final judging if business state has drifted
+- keep screenshots, slides, and video aligned to the same seeded scenario
+
+See [docs/submission/DATA_AND_DB_READINESS.md](docs/submission/DATA_AND_DB_READINESS.md) for the full local-versus-hosted readiness checklist and packaging rules.
+
+## Route Naming Note
+
+The UI label is `Demo Operations`, but the frontend route remains `/demo-state` for compatibility. This is expected and should be explained consistently in the video and slides.

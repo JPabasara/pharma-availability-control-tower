@@ -1,156 +1,131 @@
 # Pharma Availability Control Tower
 
-## Overview
+Pharma Availability Control Tower is a planner-facing control tower for pharma replenishment and dispatch coordination. It brings shortage forecasting, inbound shipment prioritization, dispatch planning, planner approval, and execution-state updates into one product so a planner can move from signal to action in a single workflow.
 
-This repository contains the current planner-facing control tower for a pharma dispatch demo environment. The platform is built around four separated layers:
+The current repository is a working MVP and competition submission codebase, not a future architecture draft. The implemented product includes a FastAPI backend, a Next.js planner console, database-backed state and audit trails, seeded demo data, and ML-backed `M1`, `M2`, and `M3` adapters under `apps/api/app/orchestration/real`.
 
-1. **Inputs and readers**
-   - vessel manifests
-   - warehouse stock
-   - DC stock
-   - sales history
-   - lorry state
-   - ETA snapshots
-2. **Decision engines**
-   - `M1` (Prioritizer) for shipment-level priority ranking — scores and ranks incoming manifests to help the clearance team decide which shipment to clear first when multiple arrive simultaneously
-   - `M2` (Forecaster) for DC request generation from 48-hour forecast need
-   - `M3` (Optimizer) for candidate dispatch planning over the next 2 planning days
-3. **Planner console**
-   - dashboard, inputs, priorities, requests, dispatch, history, demo operations, and reports
-4. **Demo operations**
-   - planner approval creates operational overlays
-   - hosted business actions advance physical state through backend APIs and UI controls
+## Problem
+
+Pharma distribution planning gets difficult when multiple operational pressures overlap:
+
+- DCs can move toward shortage at different speeds.
+- Vessel manifests can arrive at the same time and compete for clearance attention.
+- Cold-chain items need reefer-compatible dispatch.
+- Lorry capacity and day-level availability constrain what can actually be shipped.
+- Approval decisions and physical stock movement should not be treated as the same event.
+
+Without a control tower, the planner has to stitch together spreadsheets, stock snapshots, and transport constraints manually.
+
+## Solution
+
+This product turns the workflow into one planner-operated system:
+
+1. Inputs are refreshed from manifests, warehouse stock, DC stock, sales history, lorry state, and ETAs.
+2. `M2` forecasts 48-hour replenishment pressure and produces DC request lines.
+3. `M1` prioritizes inbound manifest shipments for clearance review.
+4. `M3` generates candidate two-day dispatch plans.
+5. The planner reviews, overrides, approves, or rejects the draft plan.
+6. Demo Operations advance real business state through controlled events such as manifest arrival, DC sale posting, lorry availability changes, and stop arrival.
+7. History and Reports preserve the decision trail and exportable outputs.
 
 The planner is the only end user in the current version.
 
-## Current Product Shape
+## Product Scope
+
+The seeded demo environment is intentionally compact but operationally meaningful:
 
 - 15 SKUs
 - 1 warehouse
-- 5 DCs
-- 8 lorries total
-  - 5 normal
-  - 3 reefer
+- 5 distribution centers
+- 8 lorries
 - 48-hour planning horizon
-- run-based M3 plans with `dispatch_day`
+- run-based `M3` plans with `dispatch_day`
 - maximum 2 DC stops per run
-- one lorry can be assigned once on Day 1 and once on Day 2
-- local MySQL 8 as the default persistence layer
-- contract-compatible stub engines still supported until real `M1`, `M2`, and `M3` are plugged  in
+- day-specific lorry assignment across Day 1 and Day 2
 
-## Core Rules
+## What Makes The Product Different
 
-- `M1`, `M2`, and `M3` are pure decision layers and do not mutate physical business stock directly.
-- `M2` reads trailing 30-day sales history and produces 48-hour request output.
-- `M3` plans are expressed as `runs -> stops -> items`, where each run has a `lorry_id` and `dispatch_day`.
-- Reefer lorries carry reefer cargo only.
-- Planner overrides must pass backend validation for capacity, stock feasibility, lorry-day conflicts, and reefer compatibility.
-- Approval does not change physical warehouse or DC stock.
-- Approval creates:
-  - stop-scoped warehouse reservations
-  - stop-scoped DC in-transit transfers
-  - date-based lorry day assignments
-- Physical stock changes only when business events happen through demo operations:
-  - manifest arrival
-  - DC sale posting
-  - stop arrival at a DC
+The key product decision is the separation between planning state and physical execution state.
 
-## Effective State Model
+- Approval does not directly mutate physical warehouse or DC stock.
+- Approval creates stop-scoped reservations, in-transit transfers, and lorry-day assignments.
+- Physical stock changes only when explicit business events are posted.
+- Effective stock is derived from physical stock plus active planning overlays.
 
-The platform keeps planning state and physical state separate.
-
-- **Warehouse effective stock** is derived from physical stock and active reservations.
-- **DC effective stock** is derived from physical stock and active in-transit transfers.
-- **Lorry availability** is evaluated over the next 2 planning days, not as a single timeless flag.
-- **Demo operations** move the business state forward without turning the planner console into a raw database editor.
-
-This is what prevents ghost inventory and keeps the engines stateless.
+This keeps the planner workflow auditable and avoids ghost inventory.
 
 ## Planner Console
 
-The frontend is a planner-only console with these views:
+The implemented planner console includes these views:
 
 - `Dashboard`
 - `Inputs`
-- `Prioritizer`
 - `Forecaster`
+- `Prioritizer`
 - `Optimizer`
 - `History`
 - `Demo Operations`
 - `Reports`
 
-The UI label is now **Demo Operations**. For route compatibility, the frontend route remains `/demo-state`.
+The UI label is `Demo Operations`. For route compatibility, the frontend route remains `/demo-state`.
 
-## Demo Operations
+## Runtime Architecture
 
-The current hosted demo no longer depends on CLI-only business progression. The platform now supports operational actions through backend APIs and the frontend workspace on `/demo-state`.
+The active runtime in this cleaned repository is centered on these areas:
 
-Implemented demo operations include:
+- `apps/api/app`
+  - FastAPI application, route groups, orchestration, planner flow, demo operations, and dependencies
+- `apps/web`
+  - Next.js App Router planner console
+- `apps/api/app/orchestration/real`
+  - real `M1`, `M2`, and `M3` adapters used for the ML-backed demo path
+- `apps/api/app/orchestration/stubs`
+  - compatibility stubs kept for runtime safety and fallback
+- `ml/`
+  - model code, synthetic dataset generation, and committed model artifacts
+- `storage/`
+  - SQLAlchemy models and persistence layer
+- `db/`
+  - Alembic migrations and seed entrypoints
+- `data/seed/`
+  - deterministic business seed data for the MVP scenario
 
-- manifest CSV upload with `manifest_name`, `vessel_id`, `sku_code`, `quantity`
-- manifest arrival to increase warehouse physical stock
-- DC sale posting to reduce DC physical stock and extend sales history
-- lorry availability toggle for the next 2 planning days
-- execution stop arrival to move stop-level transfer quantity into DC physical stock and release matching reservations
-
-The existing CLI scripts are still available, but they now act as thin wrappers over the same service layer rather than being the primary product path.
-
-## Backend API Shape
-
-The main route groups are:
-
-- `/api/v1/inputs/*`
-- `/api/v1/orchestration/*`
-- `/api/v1/planner/*`
-- `/api/v1/demo-state/*`
-- `/api/v1/demo-operations/*`
-- `/api/v1/reports/*`
-- `/api/v1/mock/eta/*`
-
-## Runtime Notes
+## Tech Stack
 
 - Backend: FastAPI
 - Frontend: Next.js App Router
-- Database: MySQL 8
-- Migrations: Alembic + SQLAlchemy
-- Important backend runtime dependencies now include:
-  - `python-multipart` for manifest upload
-  - `tzdata` for business-timezone support on Windows and other environments without system tz data
+- Persistence: SQLAlchemy + Alembic
+- Local database: MySQL 8 via Docker
+- Hosted database: configured through `DATABASE_URL`
+- ML and optimization:
+  - `M1`: mathematical priority scoring
+  - `M2`: XGBoost-based shortage request generation
+  - `M3`: OR-Tools candidate dispatch planning
 
-## Run Locally
+## Hosted And Local Access
 
-Use [HOW_TO_RUN.md](HOW_TO_RUN.md) for the exact local commands.
+The documentation is written with a hosted demo first and local run second.
 
-At a high level:
+- Hosted deployment and reviewer flow: [host_workflow.md](host_workflow.md)
+- Local setup and commands: [HOW_TO_RUN.md](HOW_TO_RUN.md)
+- Reviewer click path: [docs/submission/EXECUTABLE_WALKTHROUGH.md](docs/submission/EXECUTABLE_WALKTHROUGH.md)
 
-1. start MySQL with Docker
-2. reset/seed the database
-3. run the FastAPI backend
-4. run the Next.js frontend with `NEXT_PUBLIC_API_BASE_URL`
+For the competition story, the intended demo path is the ML-backed adapter flow under `apps/api/app/orchestration/real`. Stub bridge code remains in the repository for compatibility, but the submission documents focus on the implemented planning workflow rather than an unfinished-engine roadmap.
 
-Main local entry points:
+## Submission Notes
 
-- frontend: `http://127.0.0.1:3000/dashboard`
-- API docs: `http://127.0.0.1:8000/docs`
+This repository should be packaged as source code plus required data and documentation. Local runtime folders such as `.git/`, `.venv/`, `apps/web/node_modules/`, `apps/web/.next/`, and other transient caches should be excluded from the final ZIP bundle.
 
-## Current Gaps / Next Step
-
-The platform and planner console are now implemented as the current baseline. The main remaining work is:
-
-1. replace stub `M1`, `M2`, and `M3` with real engines
-2. deploy the frontend and backend
-3. add CI/CD for automatic integration on merge to `main`
-
-The current hosting direction is:
-
-- frontend on Vercel
-- backend and MySQL on Railway
-- CI/CD through GitHub Actions plus platform auto-deploy
+See [docs/submission/SUBMISSION_CONTENT_MAP.md](docs/submission/SUBMISSION_CONTENT_MAP.md) for the packaging checklist.
+See [docs/submission/DATA_AND_DB_READINESS.md](docs/submission/DATA_AND_DB_READINESS.md) for the canonical reset/reseed guidance used before screenshots, recording, and final submission packaging.
 
 ## Related Docs
 
-- [HOW_TO_RUN.md](HOW_TO_RUN.md)
-- [PLATFORM_DEMO_STATE_PLAN.md](PLATFORM_DEMO_STATE_PLAN.md)
 - [PROJECT_PLAN.md](PROJECT_PLAN.md)
-- [STRATEGY.md](STRATEGY.md)
 - [REPO_STRUCTURE.md](REPO_STRUCTURE.md)
+- [HOW_TO_RUN.md](HOW_TO_RUN.md)
+- [host_workflow.md](host_workflow.md)
+- [docs/submission/CODE_DOCUMENTATION.md](docs/submission/CODE_DOCUMENTATION.md)
+- [docs/submission/EXECUTABLE_WALKTHROUGH.md](docs/submission/EXECUTABLE_WALKTHROUGH.md)
+- [docs/submission/DATA_AND_DB_READINESS.md](docs/submission/DATA_AND_DB_READINESS.md)
+- [docs/submission/SUBMISSION_CONTENT_MAP.md](docs/submission/SUBMISSION_CONTENT_MAP.md)

@@ -336,7 +336,7 @@ function DispatchPageContent() {
       setNotice({
         tone: "success",
         title: "Plan generated",
-        message: "M2, M1, and M3 were refreshed and the live candidate set was replaced.",
+        message: "Forecaster, Prioritizer, and Optimizer were refreshed and the live candidate set was replaced.",
       });
     } catch (cause) {
       setNotice(parseApiError(cause));

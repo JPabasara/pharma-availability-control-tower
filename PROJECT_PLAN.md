@@ -1,86 +1,55 @@
-# Project Plan
+# Submission Readiness Roadmap
 
-## Summary
+This document tracks the remaining preparation work after implementation. It is intentionally focused on submission readiness, not feature development.
 
-The project has moved beyond the original 7-day MVP planning state. The platform, persistence layer, planner console, and demo operations baseline are now implemented locally and working together. This document now tracks current delivery status and the next milestones needed to finish the product.
+## Current Position
 
-## Current Delivery Status
+The MVP is already implemented:
 
-### Platform baseline
+- planner-only frontend is in place
+- backend APIs, persistence, seed data, and demo operations are in place
+- `M1`, `M2`, and `M3` real adapters exist under `apps/api/app/orchestration/real`
+- local setup, hosted deployment path, and validation checks already exist
 
-Completed:
+The remaining work is packaging and presentation.
 
-- local MySQL 8 setup through Docker
-- Alembic migrations and reset/seed workflow
-- deterministic demo data for SKUs, DCs, lorries, manifests, ETAs, and stock
-- backend readers for manifests, warehouse stock, DC stock, sales history, lorry horizon, and ETAs
-- orchestration and engine-run persistence
+## Workstream 1: Repo Cleanup And Documentation Alignment
 
-### Planner application
+Goal: make the repository easy for judges and reviewers to understand.
 
-Completed:
+- remove outdated planning markdown
+- remove placeholder-only folders that are not part of the runtime
+- rewrite the kept root docs around the implemented system
+- add a dedicated `docs/submission/` set for review and packaging guidance
 
-- planner-only Next.js frontend
-- dashboard, inputs, M1 shipment priority ranking, M2 requests, M3 dispatch, history, demo operations, and reports
-- plan comparison, run-based plan detail, override, approve, reject, and audit trail flows
-- local run-context persistence across the planner workflow
+## Workstream 2: Demo Asset Preparation
 
-### Demo operations and execution
+Goal: make the product easy to demonstrate in a short video.
 
-Completed:
+- reset and reseed the demo data before recording
+- verify the hosted flow used in the demo
+- capture stable screenshots from dashboard, inputs, requests, priorities, dispatch, and demo operations
+- prepare a short walkthrough sequence that shows planning and execution clearly
 
-- stop-scoped reservations and transfers on approval
-- date-based lorry day assignments
-- manifest CSV upload and manifest arrival
-- DC sale posting
-- lorry availability control for the next 2 planning days
-- stop arrival execution that releases matching reservations and moves stock physically
+## Workstream 3: Slide Deck Preparation
 
-### Engine integration posture
+Goal: turn the technical implementation into a business-facing product story.
 
-Current state:
+- summarize the problem and operational need
+- explain the end-to-end workflow
+- show the architecture and tech stack
+- highlight planner control, auditability, and business impact
+- keep the slide count within the submission limit
 
-- platform contracts are in place
-- stub-compatible `M1`, `M2`, and `M3` integration path exists
-- real engine replacement is still pending
+## Workstream 4: Packaging Readiness
 
-## Current Product Rules
+Goal: produce one clean submission bundle.
 
-- 48-hour planning horizon
-- run-based M3 plans with `dispatch_day`
-- one lorry may be assigned once on Day 1 and once on Day 2
-- maximum 2 stops per run
-- M2 uses trailing 30-day sales history for forecast input
-- lorry availability is horizon-based, not binary-only across the whole plan
-- planner approval creates overlays, not direct physical stock movement
+- keep required code, data, migrations, and documentation in the final folder
+- exclude local runtime clutter such as `.git/`, `.venv/`, `apps/web/node_modules/`, and `apps/web/.next/`
+- include final slides and video in the final bundle
+- perform one last smoke check before zipping
 
-## Remaining Milestones
+## Working Rule For This Track
 
-### Milestone 1: Real engine integration
-
-- replace stub `M1` with real scoring logic
-- replace stub `M2` with real request-generation logic
-- replace stub `M3` with the real optimizer/ranker
-- keep the existing planner and API contracts stable while swapping implementations
-
-### Milestone 2: Hosted environment
-
-- deploy frontend
-- deploy backend
-- deploy cloud MySQL
-- finalize production config such as CORS, environment variables, and hosted database wiring
-
-### Milestone 3: CI/CD and release flow
-
-- add GitHub Actions for backend checks and frontend build
-- auto-deploy on merge to `main`
-- protect `main`
-- make real-engine merges flow through the same deployment pipeline
-
-## Immediate Next Step
-
-The next practical delivery sequence is:
-
-1. plug in real `M1`, `M2`, and `M3`
-2. deploy the system using Vercel + Railway
-3. add CI/CD so merged engine changes auto-integrate into the hosted system
+Submission preparation should avoid unnecessary product changes. Unless a documentation pass reveals a blocking bug or a demo-breaking issue, this track should stay focused on cleanup, explanation, and packaging.

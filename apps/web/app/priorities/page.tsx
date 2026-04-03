@@ -31,7 +31,7 @@ function PrioritiesPageContent() {
       const response = await getCurrentM1Results();
       setData(response);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load M1 results.");
+      setError(cause instanceof Error ? cause.message : "Unable to load Prioritizer results.");
     } finally {
       setLoading(false);
     }
@@ -47,14 +47,14 @@ function PrioritiesPageContent() {
     try {
       await refreshM1();
       await loadCurrent();
-      setNotice({ tone: "success", message: "M2 and M1 were refreshed successfully." });
+      setNotice({ tone: "success", message: "Forecaster and Prioritizer were refreshed successfully." });
     } catch (cause) {
       const message =
         cause instanceof ApiError
           ? cause.message
           : cause instanceof Error
             ? cause.message
-            : "Unable to refresh M1.";
+            : "Unable to refresh Prioritizer.";
       setNotice({ tone: "error", message });
     } finally {
       setActionLoading(false);
@@ -106,7 +106,7 @@ function PrioritiesPageContent() {
               onClick={() => void handleRefresh()}
               disabled={loading || actionLoading}
             >
-              {actionLoading ? "..." : "Refresh M1"}
+              {actionLoading ? "..." : "Refresh Prioritizer"}
             </button>
             <Link href="/dispatch" className="button button-secondary">
               Back to Dispatch
@@ -115,7 +115,7 @@ function PrioritiesPageContent() {
         }
       />
 
-      {loading ? <LoadingPanel label="Loading M1 priorities..." /> : null}
+      {loading ? <LoadingPanel label="Loading Prioritizer results..." /> : null}
       {error ? <div className="notice notice-error"><p>{error}</p></div> : null}
       {notice ? (
         <div className={`notice notice-${notice.tone}`}>
@@ -125,8 +125,8 @@ function PrioritiesPageContent() {
 
       {!loading && !data?.available ? (
         <EmptyState
-          title="No live M1 snapshot yet"
-          description="Use Refresh M1 to regenerate M2 and M1, then review the latest priority results here."
+          title="No live Prioritizer snapshot yet"
+          description="Use Refresh Prioritizer to regenerate Forecaster and Prioritizer, then review the latest priority results here."
           actionHref="/dispatch"
           actionLabel="Open Dispatch"
         />
@@ -255,7 +255,7 @@ function ShipmentRow({
 
 export default function PrioritiesPage() {
   return (
-    <Suspense fallback={<LoadingPanel label="Loading M1 priorities..." />}>
+    <Suspense fallback={<LoadingPanel label="Loading Prioritizer results..." />}>
       <PrioritiesPageContent />
     </Suspense>
   );
